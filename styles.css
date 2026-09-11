@@ -200,6 +200,35 @@ h3 {
   gap: 22px;
 }
 
+.header-document-link {
+  display: grid;
+  min-width: 132px;
+  padding: 9px 12px;
+  border: 1px solid #c7cec7;
+  border-radius: 9px;
+  color: var(--ink);
+  background: var(--panel);
+  text-decoration: none;
+  transition: 160ms ease;
+}
+
+.header-document-link:hover {
+  border-color: var(--forest);
+  box-shadow: 0 6px 18px rgba(34, 54, 43, 0.08);
+  transform: translateY(-1px);
+}
+
+.header-document-link span {
+  color: var(--muted);
+  font-size: 0.64rem;
+}
+
+.header-document-link strong {
+  margin-top: 2px;
+  color: var(--forest);
+  font-size: 0.76rem;
+}
+
 .deadline {
   display: grid;
   text-align: right;
@@ -1033,6 +1062,14 @@ tr:last-child td {
   }
 
   .deadline {
+    display: none;
+  }
+
+  .header-document-link {
+    min-width: auto;
+  }
+
+  .header-document-link span {
     display: none;
   }
 

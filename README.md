@@ -45,6 +45,7 @@ npm test
 - `docs\SCTracker-Analyse-Kaffee-EUDR.pdf`
 - `docs\SCTracker-Gebrauchsanweisung-DE-EN-AM.pdf`
 - `docs\SCTracker-Cloud-Services-Kaffee-EUDR.pdf`
+- `docs\SCTracker-Mobile-Testcheckliste.pdf`
 - Editable source documents are stored next to the PDFs.
 
 Rebuild the PDFs with:

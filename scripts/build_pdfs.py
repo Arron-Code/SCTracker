@@ -298,10 +298,25 @@ def main():
     )
     make_document(DOCS / "SCTracker-Cloud-Services-Kaffee-EUDR.pdf", cloud)
 
+    mobile_test = cover(
+        style_map,
+        "Mobile-Testcheckliste",
+        "Android und iOS · Kaffee-Feld-App",
+    )
+    mobile_test.extend(
+        markdown_story(
+            DOCS / "mobile-test-checklist.md",
+            style_map,
+            include_title=False,
+        )
+    )
+    make_document(DOCS / "SCTracker-Mobile-Testcheckliste.pdf", mobile_test)
+
     print("Generated:")
     print(" - docs/SCTracker-Analyse-Kaffee-EUDR.pdf")
     print(" - docs/SCTracker-Gebrauchsanweisung-DE-EN-AM.pdf")
     print(" - docs/SCTracker-Cloud-Services-Kaffee-EUDR.pdf")
+    print(" - docs/SCTracker-Mobile-Testcheckliste.pdf")
 
 
 if __name__ == "__main__":
