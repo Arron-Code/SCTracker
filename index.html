@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="SCTracker - kaffeefokussierte EUDR-Traceability vom Plot bis zur DDS"
+    />
+    <title>SCTracker | Coffee Evidence</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#overview" aria-label="SCTracker Startseite">
+          <span class="brand-mark">SC</span>
+          <span>
+            <strong>SCTracker</strong>
+            <small>Coffee Evidence</small>
+          </span>
+        </a>
+
+        <nav aria-label="Hauptnavigation">
+          <a class="nav-link active" href="#overview" data-view="overview">
+            <span>01</span> Überblick
+          </a>
+          <a class="nav-link" href="#suppliers" data-view="suppliers">
+            <span>02</span> Lieferanten
+          </a>
+          <a class="nav-link" href="#plots" data-view="plots">
+            <span>03</span> Parzellen
+          </a>
+          <a class="nav-link" href="#shipments" data-view="shipments">
+            <span>04</span> Sendungen
+          </a>
+          <a class="nav-link" href="#risk" data-view="risk">
+            <span>05</span> Risiko & Evidenz
+          </a>
+          <a class="nav-link" href="#dds" data-view="dds">
+            <span>06</span> DDS
+          </a>
+          <a class="nav-link" href="#guide" data-view="guide">
+            <span>07</span> Anleitung
+          </a>
+        </nav>
+
+        <div class="sidebar-note">
+          <span class="status-dot"></span>
+          <div>
+            <strong>Prototyp</strong>
+            <small>Nur Kaffee · Demo-Daten</small>
+          </div>
+        </div>
+      </aside>
+
+      <main>
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">EUDR OPERATIONS</p>
+            <h1 id="page-title">Compliance Cockpit</h1>
+          </div>
+          <div class="topbar-actions">
+            <span class="deadline">
+              <small>Anwendungsstart</small>
+              <strong>30. Dez. 2026</strong>
+            </span>
+            <button class="avatar" aria-label="Benutzermenü">AJ</button>
+          </div>
+        </header>
+
+        <section class="view active" id="overview" data-title="Compliance Cockpit">
+          <div class="hero">
+            <div>
+              <p class="eyebrow light">AKTIVE KAFFEE-SENDUNG</p>
+              <h2>Import 2026-0142</h2>
+              <p>Washed Arabica · Jimma, Äthiopien → Hamburg, Deutschland</p>
+              <div class="hero-meta">
+                <span>18.500 kg</span>
+                <span>3 Source Lots</span>
+                <span>ET-JIM-2026</span>
+              </div>
+            </div>
+            <div class="score-ring" aria-label="Vollständigkeit 78 Prozent">
+              <strong id="completion-score">78%</strong>
+              <span>vollständig</span>
+            </div>
+          </div>
+
+          <div class="metric-grid">
+            <article class="metric-card">
+              <span class="metric-label">Lieferanten bereit</span>
+              <strong>8 / 10</strong>
+              <small class="positive">+2 diese Woche</small>
+            </article>
+            <article class="metric-card">
+              <span class="metric-label">Validierte Parzellen</span>
+              <strong>126</strong>
+              <small>7 benötigen Korrektur</small>
+            </article>
+            <article class="metric-card">
+              <span class="metric-label">Offene Reviews</span>
+              <strong>4</strong>
+              <small class="warning">2 mit hoher Priorität</small>
+            </article>
+            <article class="metric-card">
+              <span class="metric-label">DDS-Bereitschaft</span>
+              <strong>72%</strong>
+              <small>3 Pflichtangaben fehlen</small>
+            </article>
+          </div>
+
+          <div class="content-grid">
+            <article class="panel wide">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">PROCESS LINEAGE</p>
+                  <h3>Vom Plot zur Sendung</h3>
+                </div>
+                <span class="badge neutral">18.500 kg bilanziert</span>
+              </div>
+              <div class="lineage" id="lineage"></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">NÄCHSTE SCHRITTE</p>
+                  <h3>Arbeitsliste</h3>
+                </div>
+                <span class="count">4</span>
+              </div>
+              <ul class="task-list">
+                <li>
+                  <span class="task-priority high"></span>
+                  <div>
+                    <strong>Polygon korrigieren</strong>
+                    <small>Plot ET-JIM-044 · Selbstüberschneidung</small>
+                  </div>
+                </li>
+                <li>
+                  <span class="task-priority medium"></span>
+                  <div>
+                    <strong>Legalitätsnachweis prüfen</strong>
+                    <small>Kaffa Cooperative · Dokument läuft ab</small>
+                  </div>
+                </li>
+                <li>
+                  <span class="task-priority medium"></span>
+                  <div>
+                    <strong>Mengenabweichung klären</strong>
+                    <small>Batch B-2026-091 · 120 kg Differenz</small>
+                  </div>
+                </li>
+                <li>
+                  <span class="task-priority low"></span>
+                  <div>
+                    <strong>DDS-Entwurf freigeben</strong>
+                    <small>Nach Abschluss der offenen Reviews</small>
+                  </div>
+                </li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" id="suppliers" data-title="Lieferanten">
+          <div class="section-intro">
+            <div>
+              <p class="eyebrow">SUPPLIER INTAKE</p>
+              <h2>Kaffee-Lieferanten</h2>
+              <p>Datenerhebung und Freigabestatus der aktuellen Beschaffungspartner.</p>
+            </div>
+            <button class="primary-button" data-toast="Einladungsworkflow wird vorbereitet">
+              + Lieferant einladen
+            </button>
+          </div>
+          <div class="panel table-panel">
+            <table>
+              <thead>
+                <tr>
+                  <th>Organisation</th>
+                  <th>Land</th>
+                  <th>Produzenten</th>
+                  <th>Parzellen</th>
+                  <th>Datenstatus</th>
+                  <th>Letzte Aktivität</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Kaffa Cooperative Union</strong><small>SUP-00018</small></td>
+                  <td>Äthiopien</td>
+                  <td>94</td>
+                  <td>112</td>
+                  <td><span class="badge success">Vollständig</span></td>
+                  <td>Heute, 03:18</td>
+                </tr>
+                <tr>
+                  <td><strong>Jimma Highland Export</strong><small>SUP-00023</small></td>
+                  <td>Äthiopien</td>
+                  <td>11</td>
+                  <td>14</td>
+                  <td><span class="badge warning">Korrektur</span></td>
+                  <td>Gestern, 16:42</td>
+                </tr>
+                <tr>
+                  <td><strong>Sidama Coffee Farmers</strong><small>SUP-00031</small></td>
+                  <td>Äthiopien</td>
+                  <td>38</td>
+                  <td>47</td>
+                  <td><span class="badge neutral">Eingeladen</span></td>
+                  <td>8. Sep. 2026</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="view" id="plots" data-title="Parzellen & Geodaten">
+          <div class="section-intro">
+            <div>
+              <p class="eyebrow">GEO VALIDATION</p>
+              <h2>Kaffee-Parzellen</h2>
+              <p>Versionierte Produktionsflächen mit deterministischen Qualitätsprüfungen.</p>
+            </div>
+            <button class="primary-button" data-toast="GeoJSON-Import ist im Prototyp vorgemerkt">
+              GeoJSON importieren
+            </button>
+          </div>
+          <div class="map-layout">
+            <article class="map-card">
+              <div class="map-placeholder" role="img" aria-label="Abstrakte Karte der Kaffee-Parzellen">
+                <span class="terrain terrain-one"></span>
+                <span class="terrain terrain-two"></span>
+                <span class="plot plot-one">42</span>
+                <span class="plot plot-two">43</span>
+                <span class="plot plot-three alert">44</span>
+                <div class="map-key"><i></i> Jimma · Oromia</div>
+              </div>
+            </article>
+            <article class="panel">
+              <p class="eyebrow">VALIDIERUNGSERGEBNIS</p>
+              <h3>Plot ET-JIM-044</h3>
+              <div class="validation-list">
+                <div><span class="check ok">✓</span><span>Ländergrenze: Äthiopien</span></div>
+                <div><span class="check ok">✓</span><span>Fläche plausibel: 2,7 ha</span></div>
+                <div><span class="check fail">!</span><span>Polygon selbstüberschneidend</span></div>
+                <div><span class="check ok">✓</span><span>Kein Duplikat erkannt</span></div>
+                <div><span class="check pending">·</span><span>EO-Analyse ausstehend</span></div>
+              </div>
+              <button class="secondary-button" data-toast="Korrekturanfrage an Lieferanten erstellt">
+                Korrektur anfordern
+              </button>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" id="shipments" data-title="Sendungen & Mengenbilanz">
+          <div class="section-intro">
+            <div>
+              <p class="eyebrow">CHAIN OF CUSTODY</p>
+              <h2>Kaffee-Sendungen</h2>
+              <p>Mengenbasierte Herkunftszuordnung über Lots, Batches und Transformationen.</p>
+            </div>
+          </div>
+          <div class="panel table-panel">
+            <table>
+              <thead>
+                <tr>
+                  <th>Sendung</th>
+                  <th>Produkt</th>
+                  <th>Menge</th>
+                  <th>Herkunft</th>
+                  <th>Bilanz</th>
+                  <th>EUDR-Fall</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>IMP-2026-0142</strong><small>ETA Hamburg 18.12.2026</small></td>
+                  <td>Washed Arabica</td>
+                  <td>18.500 kg</td>
+                  <td>Jimma, ET</td>
+                  <td><span class="badge success">Ausgeglichen</span></td>
+                  <td><span class="badge warning">In Prüfung</span></td>
+                </tr>
+                <tr>
+                  <td><strong>IMP-2026-0137</strong><small>Eingetroffen 2.12.2026</small></td>
+                  <td>Natural Arabica</td>
+                  <td>12.800 kg</td>
+                  <td>Sidama, ET</td>
+                  <td><span class="badge success">Ausgeglichen</span></td>
+                  <td><span class="badge success">Bereit</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="view" id="risk" data-title="Risiko & Evidenz">
+          <div class="section-intro">
+            <div>
+              <p class="eyebrow">EXPLAINABLE REVIEW</p>
+              <h2>Risiko- und Evidenzprüfung</h2>
+              <p>Getrennte Signale statt einer undurchsichtigen Gesamtampel.</p>
+            </div>
+          </div>
+          <div class="risk-grid" id="risk-grid"></div>
+          <article class="panel evidence-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">EVIDENCE PACK</p>
+                <h3>IMP-2026-0142</h3>
+              </div>
+              <button class="secondary-button" data-toast="Evidence-Pack-Manifest vorbereitet">
+                Manifest ansehen
+              </button>
+            </div>
+            <div class="evidence-progress">
+              <div><span style="width: 82%"></span></div>
+              <strong>14 von 17 Nachweisen vollständig</strong>
+            </div>
+            <p class="muted">
+              Enthält Plot-Versionen, Dokument-Hashes, Mengenherkunft, Analyse-IDs,
+              Regelversionen und Review-Entscheidungen.
+            </p>
+          </article>
+        </section>
+
+        <section class="view" id="dds" data-title="DDS-Vorbereitung">
+          <div class="section-intro">
+            <div>
+              <p class="eyebrow">EU INFORMATION SYSTEM</p>
+              <h2>DDS-Vorbereitung</h2>
+              <p>Interner Entwurf für den isolierten V3-Adapter. Keine Live-Einreichung.</p>
+            </div>
+          </div>
+          <div class="dds-layout">
+            <article class="panel">
+              <h3>Erklärungsstatus</h3>
+              <div class="stepper">
+                <div class="step complete"><span>1</span><div><strong>Produkt</strong><small>Kaffee · CN 0901</small></div></div>
+                <div class="step complete"><span>2</span><div><strong>Herkunft</strong><small>3 Lots · 126 Plot-Versionen</small></div></div>
+                <div class="step active"><span>3</span><div><strong>Risikoprüfung</strong><small>3 offene Evidenzen</small></div></div>
+                <div class="step"><span>4</span><div><strong>Freigabe</strong><small>Compliance Reviewer</small></div></div>
+                <div class="step"><span>5</span><div><strong>Einreichung</strong><small>EU V3 Adapter</small></div></div>
+              </div>
+            </article>
+            <article class="panel">
+              <h3>Bereitschaft</h3>
+              <dl class="readiness-list">
+                <div><dt>Pflichtfelder</dt><dd>31 / 34</dd></div>
+                <div><dt>Geolokationen</dt><dd>126 / 126</dd></div>
+                <div><dt>Mengenbilanz</dt><dd>Ausgeglichen</dd></div>
+                <div><dt>Review</dt><dd>Offen</dd></div>
+                <div><dt>EU-Modus</dt><dd>Acceptance</dd></div>
+              </dl>
+              <button class="primary-button full" disabled>Einreichung noch gesperrt</button>
+              <small class="form-hint">Offene Reviews verhindern eine versehentliche Einreichung.</small>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" id="guide" data-title="Gebrauchsanweisung">
+          <div class="section-intro">
+            <div>
+              <p class="eyebrow">HELP CENTER</p>
+              <h2>Gebrauchsanweisung</h2>
+              <p>Die vollständige Anleitung liegt in drei Sprachen als PDF und Quelldokument vor.</p>
+            </div>
+          </div>
+          <div class="language-grid">
+            <a class="language-card" href="docs/user-guide-de.md">
+              <span>DE</span>
+              <strong>Deutsch</strong>
+              <small>Gebrauchsanweisung öffnen</small>
+            </a>
+            <a class="language-card" href="docs/user-guide-en.md">
+              <span>EN</span>
+              <strong>English</strong>
+              <small>Open user guide</small>
+            </a>
+            <a class="language-card" href="docs/user-guide-am.md">
+              <span>አማ</span>
+              <strong>አማርኛ</strong>
+              <small>የተጠቃሚ መመሪያን ይክፈቱ</small>
+            </a>
+          </div>
+          <article class="panel guide-download">
+            <div>
+              <p class="eyebrow">PDF</p>
+              <h3>Dreisprachiges Handbuch</h3>
+              <p>Deutsch, Englisch und Amharisch in einem druckbaren Dokument.</p>
+            </div>
+            <a class="primary-button" href="docs/SCTracker-Gebrauchsanweisung-DE-EN-AM.pdf">
+              PDF öffnen
+            </a>
+          </article>
+          <article class="panel guide-download">
+            <div>
+              <p class="eyebrow">CLOUD-ARCHITEKTUR</p>
+              <h3>Cloud-Services für SCTracker</h3>
+              <p>Empfohlener Pilot-Stack, Enterprise-Alternativen, Sicherheit und Kostenrahmen.</p>
+            </div>
+            <a class="primary-button" href="docs/SCTracker-Cloud-Services-Kaffee-EUDR.pdf">
+              PDF herunterladen
+            </a>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
