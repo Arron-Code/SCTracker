@@ -21,12 +21,18 @@ html {
   scroll-behavior: smooth;
 }
 
+@font-face {
+  font-family: "Noto Sans Ethiopic";
+  src: url("assets/fonts/NotoSansEthiopic-Variable.ttf") format("truetype");
+  font-display: swap;
+}
+
 body {
   margin: 0;
   color: var(--ink);
   background: var(--paper);
   font-family:
-    Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    Inter, "Noto Sans Ethiopic", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 button,
@@ -198,6 +204,36 @@ h3 {
   display: flex;
   align-items: center;
   gap: 22px;
+}
+
+.language-selector {
+  display: flex;
+  padding: 3px;
+  border: 1px solid #c7cec7;
+  border-radius: 9px;
+  background: var(--panel);
+}
+
+.language-selector button {
+  min-width: 38px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.language-selector button:hover {
+  color: var(--forest);
+}
+
+.language-selector button[aria-pressed="true"] {
+  color: white;
+  background: var(--forest);
 }
 
 .header-document-link {
@@ -1073,6 +1109,10 @@ tr:last-child td {
     display: none;
   }
 
+  .topbar-actions {
+    gap: 10px;
+  }
+
   .hero {
     align-items: flex-start;
     padding: 28px;
@@ -1095,6 +1135,19 @@ tr:last-child td {
 }
 
 @media (max-width: 520px) {
+  .topbar {
+    align-items: flex-start;
+  }
+
+  .topbar-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .header-document-link {
+    display: none;
+  }
+
   .metric-grid,
   .risk-grid {
     grid-template-columns: 1fr;
