@@ -10,6 +10,7 @@ import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.Signature
 import java.security.spec.ECGenParameterSpec
+import com.sctracker.reference.domain.P256SignatureV1
 
 enum class KeyProtection {
     STRONGBOX,
@@ -78,6 +79,9 @@ class AndroidKeystoreSigner(private val alias: String = "sctracker-reference-p25
             sign()
         }
     }
+
+    fun signWireEnvelope(message: ByteArray): ByteArray =
+        P256SignatureV1.derToCanonicalP1363(sign(message))
 
     private fun generate(requireStrongBox: Boolean) {
         val builder = KeyGenParameterSpec.Builder(

@@ -59,23 +59,27 @@ the implementation never silently chooses a branch.
 
 ## Deterministic serialization
 
-The protocol uses a deliberately narrow canonical JSON representation rather
-than claiming deterministic CBOR support:
+`EventWireCodecV1` maps protocol events to the normative `EventEnvelope` in
+`../shared/protocol-v1.md`. The richer `LedgerEvent` remains an iOS-local storage model and is
+not itself an interchange envelope. The wire protocol uses a deliberately narrow canonical JSON
+representation rather than claiming deterministic CBOR support:
 
 - UTF-8 with no whitespace
 - object keys sorted by UTF-8 byte order
-- typed values (null, Boolean, signed integer, canonical decimal string,
-  string, array, object)
-- plain decimal notation with no exponent, trailing `.0`, leading zero, or
-  negative zero
+- null, Boolean, signed 64-bit integer, string, array, and object values
+- integer base units only; no decimal point, exponent, leading zero, plus sign,
+  or negative zero
 - RFC 3339 UTC timestamps with exactly three fractional digits where a
   timestamp is part of a signed structure
 
-Shared rules and vectors are in
-`../shared/canonical-json-v1.json`. The protocol must undergo independent
-interoperability and security review before production use. In particular,
-Unicode normalization is intentionally not performed; producers must agree on
-the exact input strings.
+Shared rules and exact genesis, Unicode, OFFER, and ACCEPT vectors are under `../shared`. Swift
+and Kotlin reproduce the same bytes and hashes in unit tests. Signatures use low-S P-256 IEEE
+P1363 over the canonical unsigned envelope. Unicode normalization is intentionally not performed.
+
+This demonstrates software-level canonicalization compatibility only. Production remains blocked
+on real iOS/Android package exchange, trust-registry/revocation, device enrollment and
+attestation, Secure Enclave/Android Keystore trials, reboot/clock behavior, and the mandatory
+chip/profile/device proof of concept below.
 
 ## Security and privacy boundaries
 

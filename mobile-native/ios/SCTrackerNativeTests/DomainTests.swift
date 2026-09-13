@@ -115,6 +115,114 @@ final class DomainTests: XCTestCase {
         )
     }
 
+    func testWireProtocolGenesisAndUnicodeVectors() throws {
+        let envelope = wireEnvelope(signature: String(repeating: "A", count: 86) + "==")
+        let payload: CanonicalValue = .object(["state": .string("ISSUED")])
+        XCTAssertEqual(
+            String(decoding: EventWireCodecV1.payloadBytes(payload), as: UTF8.self),
+            #"{"state":"ISSUED"}"#
+        )
+        XCTAssertEqual(
+            CanonicalJSON.sha256(EventWireCodecV1.payloadBytes(payload)),
+            "28ec7bccebeef254cf6d88315dd1999f7306d86721e07e021f9cf55a8793771e"
+        )
+        XCTAssertEqual(
+            String(decoding: EventWireCodecV1.signingBytes(envelope), as: UTF8.self),
+            #"{"actorId":"ACT-1","aggregateId":"SACK-1","createdMonotonic":123456789,"deviceId":"DEV-1","eventId":"EV-1","eventType":"SACK_ISSUED","keyId":"KEY-1","payloadHash":"28ec7bccebeef254cf6d88315dd1999f7306d86721e07e021f9cf55a8793771e","prevHash":"0000000000000000000000000000000000000000000000000000000000000000","reportedUtc":"2026-09-13T16:00:00.000Z","schema":1,"sequence":1}"#
+        )
+        XCTAssertEqual(
+            EventWireCodecV1.eventHash(envelope),
+            "0a48be7c8f9aab2f6c2a3066d45c4371d2eec94fd307c59ecd60a2243d348773"
+        )
+        let envelopeData = try EventWireCodecV1.envelopeBytes(envelope)
+        XCTAssertEqual(
+            CanonicalJSON.sha256(envelopeData),
+            "8a9703d8cd5eac9ae00cf1e8943ad206c6d4ab5f5d4a6e081c796b8a2b61348e"
+        )
+        XCTAssertEqual(try EventWireCodecV1.decodeEnvelope(envelopeData), envelope)
+        XCTAssertThrowsError(try EventWireCodecV1.decodeEnvelope(Data(" \(String(decoding: envelopeData, as: UTF8.self))".utf8)))
+
+        let unicode: CanonicalValue = .object([
+            "\u{10000}": .string("supplementary"),
+            "\u{E000}": .string("private"),
+            "control": .string("A\nB\t\"\\")
+        ])
+        let unicodeBytes = CanonicalJSON.data(unicode)
+        XCTAssertEqual(
+            String(decoding: unicodeBytes, as: UTF8.self),
+            "{\"control\":\"A\\nB\\t\\\"\\\\\",\"\u{E000}\":\"private\",\"\u{10000}\":\"supplementary\"}"
+        )
+        XCTAssertEqual(
+            CanonicalJSON.sha256(unicodeBytes),
+            "2e28d5f76e9c174abc2af77b68ff4b9160fb36c83f7c0b88bfbb5286f70b5f3b"
+        )
+    }
+
+    func testWireTransferOfferAndAcceptVectors() {
+        let offer = EventWireCodecV1.offerPayload(
+            transferId: "TR-1",
+            fromActorId: "ACT-1",
+            toActorId: "ACT-2",
+            sackIds: ["SACK-2", "SACK-1"]
+        )
+        XCTAssertEqual(
+            String(decoding: CanonicalJSON.data(offer), as: UTF8.self),
+            #"{"fromActorId":"ACT-1","sackIds":["SACK-1","SACK-2"],"toActorId":"ACT-2","transferId":"TR-1"}"#
+        )
+        let offerHash = CanonicalJSON.sha256(CanonicalJSON.data(offer))
+        XCTAssertEqual(offerHash, "7c21ee171ccb1acde534350f0f4905ab17abd0860aae3012bc681e572f75a590")
+        let accept = EventWireCodecV1.decisionPayload(
+            transferId: "TR-1",
+            decision: "ACCEPT",
+            offerHash: offerHash
+        )
+        XCTAssertEqual(
+            String(decoding: CanonicalJSON.data(accept), as: UTF8.self),
+            #"{"decision":"ACCEPT","offerHash":"7c21ee171ccb1acde534350f0f4905ab17abd0860aae3012bc681e572f75a590","transferId":"TR-1"}"#
+        )
+        XCTAssertEqual(
+            CanonicalJSON.sha256(CanonicalJSON.data(accept)),
+            "88cf4afa9062dffed0bc350acbb039e7c735c9569f6a622f7715beba516d64f5"
+        )
+    }
+
+    func testWireSignatureTamperAndReplayRules() throws {
+        let signer = TestSigner()
+        let unsigned = wireEnvelope(signature: nil)
+        let signingBytes = EventWireCodecV1.signingBytes(unsigned)
+        let internalSignature = try signer.sign(signingBytes)
+        let der = try XCTUnwrap(Data(base64Encoded: internalSignature.signatureBase64))
+        let p1363 = try P256SignatureV1.canonicalP1363(derRepresentation: der)
+        let signed = wireEnvelope(signature: p1363.base64EncodedString())
+        let event = WireEventV1(
+            envelope: signed,
+            payload: .object(["state": .string("ISSUED")])
+        )
+        let publicKeyData = try XCTUnwrap(Data(base64Encoded: internalSignature.publicKeyBase64))
+        let publicKey = try P256.Signing.PublicKey(rawRepresentation: publicKeyData)
+        let verifier: (String, Data, Data) -> Bool = { keyId, bytes, signatureData in
+            guard keyId == "KEY-1",
+                  let signature = try? P256.Signing.ECDSASignature(
+                    rawRepresentation: signatureData
+                  ) else {
+                return false
+            }
+            return publicKey.isValidSignature(signature, for: bytes)
+        }
+
+        XCTAssertTrue(EventWireCodecV1.validate(event, verifier: verifier))
+        var tampered = event
+        tampered.payload = .object(["state": .string("VOID")])
+        XCTAssertFalse(EventWireCodecV1.validate(tampered, verifier: verifier))
+
+        let replayGuard = WireReplayGuardV1()
+        XCTAssertTrue(try replayGuard.admit(event))
+        XCTAssertFalse(try replayGuard.admit(event))
+        var collision = event
+        collision.envelope.actorId = "ACT-OTHER"
+        XCTAssertThrowsError(try replayGuard.admit(collision))
+    }
+
     @MainActor
     func testVerifiedImportReplaysWorkflowProjection() throws {
         let sourceRepository = MemoryRepository()
@@ -162,6 +270,23 @@ final class DomainTests: XCTestCase {
             gps: nil,
             mediaIDs: [],
             payload: .object(["state": .string(type)])
+        )
+    }
+
+    private func wireEnvelope(signature: String?) -> WireEventEnvelopeV1 {
+        WireEventEnvelopeV1(
+            eventId: "EV-1",
+            eventType: "SACK_ISSUED",
+            aggregateId: "SACK-1",
+            sequence: 1,
+            prevHash: EventWireCodecV1.genesisHash,
+            createdMonotonic: 123_456_789,
+            reportedUtc: "2026-09-13T16:00:00.000Z",
+            deviceId: "DEV-1",
+            actorId: "ACT-1",
+            payloadHash: "28ec7bccebeef254cf6d88315dd1999f7306d86721e07e021f9cf55a8793771e",
+            keyId: "KEY-1",
+            signature: signature
         )
     }
 

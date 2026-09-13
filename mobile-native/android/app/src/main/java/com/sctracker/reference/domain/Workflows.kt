@@ -1,10 +1,5 @@
 package com.sctracker.reference.domain
 
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.add
-import kotlinx.serialization.json.put
-
 object SackStateMachine {
     private val allowed = mapOf(
         LifecycleState.UNISSUED to setOf(LifecycleState.ISSUED, LifecycleState.VOID),
@@ -54,13 +49,9 @@ object TransferWorkflow {
         toActorId: String,
     ): Transfer {
         require(sackIds.isNotEmpty())
-        val payload = buildJsonObject {
-            put("fromActorId", fromActorId)
-            put("id", id)
-            put("sackIds", buildJsonArray { sackIds.sorted().forEach(::add) })
-            put("toActorId", toActorId)
-        }
-        return Transfer(id, sackIds.sorted(), fromActorId, toActorId, CanonicalJson.hash(payload))
+        val sortedSackIds = sackIds.sortedWith(Comparator(CanonicalJson::compareUtf8))
+        val payload = EventWireCodecV1.offerPayload(id, fromActorId, toActorId, sortedSackIds)
+        return Transfer(id, sortedSackIds, fromActorId, toActorId, CanonicalJson.hash(payload))
     }
 
     fun decide(

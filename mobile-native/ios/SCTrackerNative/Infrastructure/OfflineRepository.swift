@@ -262,11 +262,18 @@ final class AppModel: ObservableObject {
 
     func offerTransfer(batchID: UUID, to receiverID: UUID) {
         perform {
-            guard snapshot.batches.contains(where: { $0.id == batchID }) else {
+            guard let batch = snapshot.batches.first(where: { $0.id == batchID }) else {
                 throw SCTrackerFailure(code: .invalidInput, detail: "Batch was not found")
             }
             let transferID = UUID()
             let offeredAt = Date()
+            let offerPayload = EventWireCodecV1.offerPayload(
+                transferId: transferID.uuidString.lowercased(),
+                fromActorId: actorID.uuidString.lowercased(),
+                toActorId: receiverID.uuidString.lowercased(),
+                sackIds: batch.sackIDs.map { $0.uuidString.lowercased() }
+            )
+            let offerHash = CanonicalJSON.sha256(CanonicalJSON.data(offerPayload))
             let draft = EventDraft(
                 id: UUID(),
                 entityType: .transfer,
@@ -277,11 +284,7 @@ final class AppModel: ObservableObject {
                 deviceID: deviceID,
                 gps: nil,
                 mediaIDs: [],
-                payload: .object([
-                    "batchId": .string(batchID.uuidString.lowercased()),
-                    "fromActorId": .string(actorID.uuidString.lowercased()),
-                    "toActorId": .string(receiverID.uuidString.lowercased())
-                ])
+                payload: offerPayload
             )
             let event = try EventLedger.append(draft: draft, to: snapshot.events, signer: signer)
             var updated = snapshot
@@ -291,7 +294,7 @@ final class AppModel: ObservableObject {
                 batchID: batchID,
                 fromActorID: actorID,
                 toActorID: receiverID,
-                offerEventHash: event.eventHash,
+                offerEventHash: offerHash,
                 status: .pending,
                 offeredAt: offeredAt,
                 resolvedAt: nil
@@ -323,7 +326,11 @@ final class AppModel: ObservableObject {
                 deviceID: deviceID,
                 gps: nil,
                 mediaIDs: [],
-                payload: .object(["offerEventHash": .string(offerHash)])
+                payload: EventWireCodecV1.decisionPayload(
+                    transferId: transferID.uuidString.lowercased(),
+                    decision: action == .accept ? "ACCEPT" : "REJECT",
+                    offerHash: offerHash
+                )
             )
             let event = try EventLedger.append(draft: draft, to: snapshot.events, signer: signer)
             var updated = snapshot
@@ -515,18 +522,36 @@ final class AppModel: ObservableObject {
             }
             switch action {
             case .offer:
-                guard let batchID = payload["batchId"]?.uuid,
+                guard payload["transferId"]?.uuid == event.entityID,
+                      let sackValues = payload["sackIds"]?.array,
+                      !sackValues.isEmpty else {
+                    throw SCTrackerFailure(code: .packageInvalid, detail: "Transfer offer is invalid")
+                }
+                let parsedSackIDs = sackValues.map(\.uuid)
+                guard parsedSackIDs.allSatisfy({ $0 != nil }) else {
+                    throw SCTrackerFailure(code: .packageInvalid, detail: "Transfer sack identifier is invalid")
+                }
+                let sackIDs = parsedSackIDs.compactMap { $0 }
+                let sacks = sackIDs.compactMap { sackID in
+                    result.sacks.first(where: { $0.id == sackID })
+                }
+                let ownerIDs = Set(sacks.map(\.batchID))
+                guard ownerIDs.count == 1,
+                      sacks.count == sackIDs.count,
+                      let batchID = ownerIDs.first,
+                      let batch = result.batches.first(where: { $0.id == batchID }),
                       let fromActorID = payload["fromActorId"]?.uuid,
                       let toActorID = payload["toActorId"]?.uuid,
                       result.transfers.contains(where: { $0.id == event.entityID }) == false else {
                     throw SCTrackerFailure(code: .packageInvalid, detail: "Transfer offer is invalid")
                 }
+                let offerHash = CanonicalJSON.sha256(CanonicalJSON.data(event.payload))
                 result.transfers.append(Transfer(
                     id: event.entityID,
-                    batchID: batchID,
+                    batchID: batch.id,
                     fromActorID: fromActorID,
                     toActorID: toActorID,
-                    offerEventHash: event.eventHash,
+                    offerEventHash: offerHash,
                     status: .pending,
                     offeredAt: event.recordedAt,
                     resolvedAt: nil
@@ -534,7 +559,9 @@ final class AppModel: ObservableObject {
             case .accept, .reject:
                 guard let index = result.transfers.firstIndex(where: { $0.id == event.entityID }),
                       result.transfers[index].status == .pending,
-                      payload["offerEventHash"]?.string == result.transfers[index].offerEventHash else {
+                      payload["transferId"]?.uuid == event.entityID,
+                      payload["decision"]?.string == (action == .accept ? "ACCEPT" : "REJECT"),
+                      payload["offerHash"]?.string == result.transfers[index].offerEventHash else {
                     throw SCTrackerFailure(code: .packageInvalid, detail: "Transfer response does not reference its pending offer")
                 }
                 result.transfers[index].status = action == .accept ? .accepted : .rejected

@@ -31,7 +31,9 @@ object CanonicalJson {
             JsonNull -> append("null")
             is JsonObject -> {
                 append('{')
-                element.entries.sortedBy { it.key }.forEachIndexed { index, (key, value) ->
+                element.entries.sortedWith { left, right ->
+                    compareUtf8(left.key, right.key)
+                }.forEachIndexed { index, (key, value) ->
                     if (index > 0) append(',')
                     append(Json.encodeToString(JsonPrimitive.serializer(), JsonPrimitive(key)))
                     append(':')
@@ -48,7 +50,10 @@ object CanonicalJson {
                 append(']')
             }
             is JsonPrimitive -> {
-                require(element.isString || element.content.matches(NUMBER_OR_BOOLEAN)) {
+                require(
+                    element.isString ||
+                        (element.content.matches(INTEGER_OR_BOOLEAN) && element.content != "-0"),
+                ) {
                     "Non-finite or non-canonical primitive"
                 }
                 append(Json.encodeToString(JsonPrimitive.serializer(), element))
@@ -56,6 +61,16 @@ object CanonicalJson {
         }
     }
 
-    private val NUMBER_OR_BOOLEAN =
-        Regex("""true|false|-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?""")
+    internal fun compareUtf8(left: String, right: String): Int {
+        val leftBytes = left.toByteArray(Charsets.UTF_8)
+        val rightBytes = right.toByteArray(Charsets.UTF_8)
+        for (index in 0 until minOf(leftBytes.size, rightBytes.size)) {
+            val comparison = (leftBytes[index].toInt() and 0xff)
+                .compareTo(rightBytes[index].toInt() and 0xff)
+            if (comparison != 0) return comparison
+        }
+        return leftBytes.size.compareTo(rightBytes.size)
+    }
+
+    private val INTEGER_OR_BOOLEAN = Regex("""true|false|-?(0|[1-9]\d*)""")
 }

@@ -76,19 +76,22 @@ approved package transport, and reviewed synchronization policy.
 
 ## Event and package integrity
 
-Each event contains a one-based `sequence`, `prevHash`, `payloadHash`, and `eventHash`.
-`payloadHash` is SHA-256 over canonical payload JSON. `eventHash` is SHA-256 over a canonical
-envelope containing identity, aggregate, event type, sequence, previous hash, payload hash,
-timestamp, actor, and device. The genesis previous hash is 64 zeroes.
+`EventWireCodecV1` maps protocol events to the normative `EventEnvelope` in
+`mobile-native\shared\protocol-v1.md`. It signs and hashes the exact canonical UTF-8 bytes, uses
+the 64-zero genesis hash, enforces integer-only JSON and UTF-8 byte key ordering, and fixes
+signatures to low-S P-256 IEEE P1363. The richer `Event` model remains local storage format and is
+not an interchange envelope.
 
 Package manifests are sorted and canonicalized before ECDSA P-256/SHA-256 signing. Import
 verification checks the signature, path safety, exact file set, byte sizes, and every file hash
 before returning a valid result. A caller must keep invalid, divergent, or untrusted packages in
 quarantine and must not partially import them.
 
-Canonicalization and the fixed vector are documented in
-`mobile-native\shared\protocol-v1.md`. This custom profile must be independently reviewed and
-tested against every other client implementation before production use.
+Canonicalization and fixed genesis, Unicode, OFFER, and ACCEPT vectors are documented under
+`mobile-native\shared`. Kotlin and Swift reproduce the same bytes and hashes in unit tests.
+Production use remains blocked on cross-device package exchange, trust-registry/revocation,
+device enrollment and attestation, Secure Enclave/Keystore trials, reboot/clock tests, and the
+chip/profile/device proof of concept below.
 
 ## Security and privacy boundaries
 

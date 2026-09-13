@@ -1,0 +1,25 @@
+{
+  "protocol": "sctracker.event-envelope/1",
+  "genesis": {
+    "payloadCanonicalUtf8": "{\"state\":\"ISSUED\"}",
+    "payloadUtf8Hex": "7b227374617465223a22495353554544227d",
+    "payloadSha256": "28ec7bccebeef254cf6d88315dd1999f7306d86721e07e021f9cf55a8793771e",
+    "signingCanonicalUtf8": "{\"actorId\":\"ACT-1\",\"aggregateId\":\"SACK-1\",\"createdMonotonic\":123456789,\"deviceId\":\"DEV-1\",\"eventId\":\"EV-1\",\"eventType\":\"SACK_ISSUED\",\"keyId\":\"KEY-1\",\"payloadHash\":\"28ec7bccebeef254cf6d88315dd1999f7306d86721e07e021f9cf55a8793771e\",\"prevHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"reportedUtc\":\"2026-09-13T16:00:00.000Z\",\"schema\":1,\"sequence\":1}",
+    "signingSha256": "0a48be7c8f9aab2f6c2a3066d45c4371d2eec94fd307c59ecd60a2243d348773",
+    "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "envelopeCanonicalUtf8": "{\"actorId\":\"ACT-1\",\"aggregateId\":\"SACK-1\",\"createdMonotonic\":123456789,\"deviceId\":\"DEV-1\",\"eventId\":\"EV-1\",\"eventType\":\"SACK_ISSUED\",\"keyId\":\"KEY-1\",\"payloadHash\":\"28ec7bccebeef254cf6d88315dd1999f7306d86721e07e021f9cf55a8793771e\",\"prevHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"reportedUtc\":\"2026-09-13T16:00:00.000Z\",\"schema\":1,\"sequence\":1,\"signature\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\"}",
+    "envelopeSha256": "8a9703d8cd5eac9ae00cf1e8943ad206c6d4ab5f5d4a6e081c796b8a2b61348e",
+    "note": "The all-zero signature is a serialization fixture and is intentionally cryptographically invalid."
+  },
+  "unicode": {
+    "canonicalUtf8": "{\"control\":\"A\\nB\\t\\\"\\\\\",\"\":\"private\",\"𐀀\":\"supplementary\"}",
+    "utf8Hex": "7b22636f6e74726f6c223a22415c6e425c745c225c5c222c22ee8080223a2270726976617465222c22f0908080223a22737570706c656d656e74617279227d",
+    "sha256": "2e28d5f76e9c174abc2af77b68ff4b9160fb36c83f7c0b88bfbb5286f70b5f3b"
+  },
+  "transfer": {
+    "offerCanonicalUtf8": "{\"fromActorId\":\"ACT-1\",\"sackIds\":[\"SACK-1\",\"SACK-2\"],\"toActorId\":\"ACT-2\",\"transferId\":\"TR-1\"}",
+    "offerSha256": "7c21ee171ccb1acde534350f0f4905ab17abd0860aae3012bc681e572f75a590",
+    "acceptCanonicalUtf8": "{\"decision\":\"ACCEPT\",\"offerHash\":\"7c21ee171ccb1acde534350f0f4905ab17abd0860aae3012bc681e572f75a590\",\"transferId\":\"TR-1\"}",
+    "acceptSha256": "88cf4afa9062dffed0bc350acbb039e7c735c9569f6a622f7715beba516d64f5"
+  }
+}
