@@ -1,43 +1,62 @@
 # SCTracker Coffee Mobile
 
-Gemeinsame Expo/React-Native-App für Android und iOS. Die App ist auf Kaffee beschränkt und für Lieferanten, Kooperativen und Feldteams ausgelegt.
+Expo/React-Native-App für Android und iOS mit vollständiger Oberfläche in Deutsch, Englisch, Amharisch und Tigrinya. Die Sprachauswahl bleibt dauerhaft im Header verfügbar und wird lokal gespeichert.
 
-## Enthaltene Funktionen
+## Funktionen
 
-- mobiles Kaffee-Compliance-Cockpit
-- Lieferanten- und Produzentenübersicht
-- GPS-Erfassung für Kaffee-Plots
-- lokale Offline-Entwürfe mit AsyncStorage
-- Sendungs- und DDS-Bereitschaft
-- vollständig lokalisierte Bedienoberfläche und Hilfe in Deutsch, Englisch, Amharisch und Tigrinya
+- Offline-fähige Lieferanten- und Kaffee-Plot-Erfassung
+- echte GeoJSON-Polygone durch mehrere GPS-Punkte sowie JSON-Import und -Bearbeitung
+- persistente, migrationsfähige AsyncStorage-Daten (`v1`-GPS-Entwürfe werden nach `v2` migriert)
+- retry-sichere Push/Pull-Synchronisierung mit UUID-/Idempotency-IDs, Outbox, Inbox-Cursor und sichtbarer Konfliktauflösung
+- Dokument-Upload über Presigned-URL-Initiierung und Abschluss
+- Satellitenanalyse, Evidence-Pack-Anforderung mit Download/Teilen sowie DDS-Entwurf, Validierung, Einreichung und Status
+- sichtbarer Online-/Offline-, Konfigurations- und Synchronisierungsstatus mit manueller Wiederholung
 
-Die aktuelle Version ist ein Prototyp. Lokale Entwürfe werden noch nicht mit einem Backend synchronisiert und es erfolgt keine Übermittlung an das EU Information System.
+`NOT_CONFIGURED` und eine fehlende API-URL werden immer als blockierende Fehler angezeigt und nie als Erfolg behandelt.
 
-## Entwicklung starten
+## Konfiguration
+
+`.env.example` nach `.env.local` kopieren und die Backend-Basis-URL setzen:
 
 ```powershell
-Set-Location mobile
-npm start
+Copy-Item .env.example .env.local
 ```
 
-Danach kann der QR-Code mit Expo Go geöffnet werden. Android kann außerdem mit `npm run android` gestartet werden. Für den nativen iOS-Simulator ist macOS erforderlich; auf einem physischen iPhone funktioniert der Entwicklungsstart über Expo Go.
+```dotenv
+EXPO_PUBLIC_API_URL=http://localhost:3000
+```
+
+Es ist keine Produktions-URL fest eingebaut. Für ein physisches Gerät muss die URL vom Gerät erreichbar sein; `localhost` verweist dort auf das Gerät selbst.
+
+Die App erwartet JSON-Antworten im Format `{ "data": ..., "meta": ... }` und Fehler als `{ "error": { "code": "...", "message": "...", "details": ... } }`.
+
+Verwendete Endpunkte:
+
+- `POST /api/v1/sync/push`
+- `GET /api/v1/sync/pull?cursor=...`
+- `POST /api/v1/documents/uploads`
+- `POST /api/v1/documents/uploads/:id/complete`
+- `POST|GET /api/v1/satellite/analyses[/:id]`
+- `POST|GET /api/v1/evidence-packs[/:id]`
+- `POST|GET /api/v1/dds/drafts[/:id]`
+- `POST /api/v1/dds/drafts/:id/validate`
+- `POST /api/v1/dds/drafts/:id/submit`
+
+## Entwicklung
+
+```powershell
+npm install
+npm start
+```
 
 ## Prüfungen
 
 ```powershell
+npm test
 npm run typecheck
+npx expo-doctor
 npm run export:android
 npm run export:ios
 ```
 
-## Installierbare Builds
-
-Expo Application Services kann signierte Android- und iOS-Builds erzeugen:
-
-```powershell
-npx eas-cli login
-npx eas-cli build --profile preview --platform android
-npx eas-cli build --profile preview --platform ios
-```
-
-Für einen iOS-Build und die App-Store-Veröffentlichung wird ein Apple-Developer-Konto benötigt. Für Google Play wird ein Google-Play-Developer-Konto benötigt. Store-Builds sollten erst nach Backend-Anbindung, Security Review, Datenschutzprüfung und muttersprachlicher Prüfung der amharischen und tigrinischen Texte erstellt werden.
+Für signierte Builds werden weiterhin Expo Application Services sowie die jeweiligen Apple-/Google-Entwicklerkonten benötigt.

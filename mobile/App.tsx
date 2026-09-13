@@ -1,8 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import NetInfo from "@react-native-community/netinfo";
 import { Ionicons } from "@expo/vector-icons";
+import * as DocumentPicker from "expo-document-picker";
+import { File, Paths } from "expo-file-system";
 import * as Location from "expo-location";
+import * as Sharing from "expo-sharing";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -18,33 +22,42 @@ import {
   View,
 } from "react-native";
 import {
+  ApiError,
+  getApiBaseUrl,
+  getOperation,
+  requestOperation,
+  submitDds,
+  uploadDocument,
+  validateDds,
+} from "./src/api";
+import {
+  closePolygon,
+  createUuid,
+  parsePolygon,
+  type GeoJsonPolygon,
+  type OperationalRequest,
+  type PersistedState,
+  type Plot,
+  type Position,
+  type Supplier,
+  type SyncConflict,
+} from "./src/domain";
+import {
   isLanguage,
   languages,
   translations,
   type Language,
   type Translation,
 } from "./src/i18n";
+import { LANGUAGE_STORAGE_KEY, loadState, saveState } from "./src/storage";
+import { synchronize } from "./src/sync";
 
-type Tab = "home" | "suppliers" | "capture" | "shipments" | "help";
-
-type PlotDraft = {
-  id: string;
-  producer: string;
-  farmName: string;
-  areaHa: string;
-  latitude: number;
-  longitude: number;
-  capturedAt: string;
-  syncStatus: "local";
-};
-
-const STORAGE_KEY = "sctracker.plotDrafts.v1";
-const LANGUAGE_STORAGE_KEY = "sctracker.language.v1";
+type Tab = "home" | "suppliers" | "plots" | "operations" | "help";
 
 const palette = {
   ink: "#14251D",
   forest: "#1F5A43",
-  forestDark: "#174735",
+  dark: "#174735",
   paper: "#F4F2EA",
   panel: "#FFFEFA",
   line: "#DDE0D8",
@@ -54,547 +67,588 @@ const palette = {
   red: "#A64536",
   softGreen: "#DDEADF",
   softAmber: "#F8E8CE",
+  softRed: "#F7DED9",
 };
 
-const suppliers = [
-  {
-    id: "SUP-00018",
-    name: "Kaffa Cooperative Union",
-    region: "Jimma · Oromia",
-    producers: 94,
-    plots: 112,
-    status: "complete" as const,
-    tone: "success" as const,
-  },
-  {
-    id: "SUP-00023",
-    name: "Jimma Highland Export",
-    region: "Jimma · Oromia",
-    producers: 11,
-    plots: 14,
-    status: "correction" as const,
-    tone: "warning" as const,
-  },
-  {
-    id: "SUP-00031",
-    name: "Sidama Coffee Farmers",
-    region: "Sidama",
-    producers: 38,
-    plots: 47,
-    status: "invited" as const,
-    tone: "neutral" as const,
-  },
-];
+function statusLabel(status: string, t: Translation) {
+  if (status === "synced" || status === "completed") return t.common.synced;
+  if (status === "conflict") return t.common.conflict;
+  if (status === "failed" || status === "not_configured") return t.common.failed;
+  return t.common.pending;
+}
 
-const shipments = [
-  {
-    id: "IMP-2026-0142",
-    product: "washedArabica" as const,
-    origin: "Jimma",
-    quantity: "18.500 kg",
-    readiness: 72,
-    status: "reviewing" as const,
-  },
-  {
-    id: "IMP-2026-0137",
-    product: "naturalArabica" as const,
-    origin: "Sidama",
-    quantity: "12.800 kg",
-    readiness: 100,
-    status: "ready" as const,
-  },
-];
-
-function TabButton({
-  active,
-  icon,
+function Button({
   label,
+  icon,
   onPress,
+  secondary = false,
+  disabled = false,
 }: {
-  active: boolean;
-  icon: keyof typeof Ionicons.glyphMap;
   label: string;
+  icon: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
+  secondary?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <Pressable
-      style={styles.tabButton}
       onPress={onPress}
-      accessibilityRole="tab"
-      accessibilityState={{ selected: active }}
+      disabled={disabled}
+      accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      style={[
+        styles.button,
+        secondary && styles.buttonSecondary,
+        disabled && styles.buttonDisabled,
+      ]}
     >
-      <Ionicons
-        name={active ? icon : (`${icon}-outline` as keyof typeof Ionicons.glyphMap)}
-        size={22}
-        color={active ? palette.forest : palette.muted}
-      />
-      <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{label}</Text>
+      <Ionicons name={icon} size={18} color={secondary ? palette.forest : "#FFFFFF"} />
+      <Text style={[styles.buttonText, secondary && styles.buttonTextSecondary]}>{label}</Text>
     </Pressable>
   );
 }
 
-function Badge({
-  children,
-  tone = "neutral",
+function Field({
+  label,
+  value,
+  onChangeText,
+  multiline = false,
+  placeholder,
+  keyboardType,
 }: {
-  children: string;
-  tone?: "success" | "warning" | "neutral";
+  label: string;
+  value: string;
+  onChangeText: (value: string) => void;
+  multiline?: boolean;
+  placeholder?: string;
+  keyboardType?: "default" | "decimal-pad" | "number-pad";
 }) {
   return (
-    <View
-      style={[
-        styles.badge,
-        tone === "success" && styles.badgeSuccess,
-        tone === "warning" && styles.badgeWarning,
-      ]}
-    >
-      <Text
-        style={[
-          styles.badgeText,
-          tone === "success" && styles.badgeTextSuccess,
-          tone === "warning" && styles.badgeTextWarning,
-        ]}
-      >
-        {children}
+    <View>
+      <Text style={styles.label}>{label}</Text>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor="#98A29C"
+        multiline={multiline}
+        keyboardType={keyboardType}
+        autoCapitalize="sentences"
+        style={[styles.input, multiline && styles.textArea]}
+        accessibilityLabel={label}
+      />
+    </View>
+  );
+}
+
+function Badge({ status, t }: { status: string; t: Translation }) {
+  const bad = status === "failed" || status === "conflict" || status === "not_configured";
+  const good = status === "synced" || status === "completed" || status === "uploaded";
+  return (
+    <View style={[styles.badge, good && styles.badgeGood, bad && styles.badgeBad]}>
+      <Text style={[styles.badgeText, good && styles.goodText, bad && styles.badText]}>
+        {statusLabel(status, t)}
       </Text>
     </View>
   );
 }
 
-function SectionTitle({
-  eyebrow,
+function Section({
   title,
   description,
+  children,
 }: {
-  eyebrow: string;
   title: string;
   description?: string;
+  children?: ReactNode;
 }) {
   return (
-    <View style={styles.sectionTitle}>
-      <Text style={styles.eyebrow}>{eyebrow}</Text>
+    <View style={styles.section}>
       <Text style={styles.heading}>{title}</Text>
       {description ? <Text style={styles.description}>{description}</Text> : null}
+      {children}
     </View>
   );
 }
 
-function HomeScreen({
-  drafts,
-  onCapture,
-  t,
-}: {
-  drafts: PlotDraft[];
-  onCapture: () => void;
-  t: Translation;
-}) {
+function HomeScreen({ state, t }: { state: PersistedState; t: Translation }) {
   return (
     <>
       <View style={styles.hero}>
-        <View style={styles.heroCopy}>
-          <Text style={styles.heroEyebrow}>{t.dashboard.activeShipment}</Text>
-          <Text style={styles.heroTitle}>IMP-2026-0142</Text>
-          <Text style={styles.heroText}>
-            {t.entities.washedArabica} · Jimma → Hamburg
-          </Text>
-          <View style={styles.heroTags}>
-            <Text style={styles.heroTag}>18.500 kg</Text>
-            <Text style={styles.heroTag}>126 {t.dashboard.plots}</Text>
-          </View>
-        </View>
-        <View style={styles.score}>
-          <Text style={styles.scoreValue}>78%</Text>
-          <Text style={styles.scoreLabel}>{t.dashboard.complete}</Text>
-        </View>
-      </View>
-
-      <View style={styles.metricRow}>
-        <View style={styles.metricCard}>
-          <Ionicons name="people" size={22} color={palette.forest} />
-          <Text style={styles.metricValue}>8/10</Text>
-          <Text style={styles.metricLabel}>{t.dashboard.suppliersReady}</Text>
-        </View>
-        <View style={styles.metricCard}>
-          <Ionicons name="cloud-offline" size={22} color={palette.amber} />
-          <Text style={styles.metricValue}>{drafts.length}</Text>
-          <Text style={styles.metricLabel}>{t.dashboard.localDrafts}</Text>
+        <Text style={styles.heroTitle}>{t.home.title}</Text>
+        <Text style={styles.heroBody}>{t.home.intro}</Text>
+        <View style={styles.metrics}>
+          {[
+            [t.home.suppliers, state.suppliers.length],
+            [t.home.plots, state.plots.length],
+            [t.home.documents, state.documents.length],
+          ].map(([label, value]) => (
+            <View key={String(label)} style={styles.metric}>
+              <Text style={styles.metricValue}>{value}</Text>
+              <Text style={styles.metricLabel}>{label}</Text>
+            </View>
+          ))}
         </View>
       </View>
-
       <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <View>
-            <Text style={styles.eyebrow}>{t.dashboard.today}</Text>
-            <Text style={styles.cardTitle}>{t.dashboard.nextSteps}</Text>
-          </View>
-          <Badge tone="warning">{t.dashboard.open}</Badge>
-        </View>
-        {[
-          ["warning", `${t.entities.plot} ET-JIM-044`, t.dashboard.recapturePolygon],
-          ["document-text", t.dashboard.legalityEvidence, t.dashboard.reviewCooperative],
-          ["cube", `${t.entities.batch} B-2026-091`, t.dashboard.clarifyDifference],
-        ].map(([icon, title, detail], index) => (
-          <View key={title} style={[styles.task, index === 2 && styles.taskLast]}>
-            <View style={styles.taskIcon}>
-              <Ionicons
-                name={icon as keyof typeof Ionicons.glyphMap}
-                size={18}
-                color={index === 0 ? palette.amber : palette.forest}
-              />
-            </View>
-            <View style={styles.taskCopy}>
-              <Text style={styles.taskTitle}>{title}</Text>
-              <Text style={styles.taskDetail}>{detail}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={palette.muted} />
-          </View>
-        ))}
+        <Text style={styles.cardTitle}>{t.sync.lastSync}</Text>
+        <Text style={styles.description}>
+          {state.lastSyncAt ? new Date(state.lastSyncAt).toLocaleString() : t.sync.never}
+        </Text>
+        <Text style={styles.caption}>{state.outbox.length} {t.sync.queued}</Text>
       </View>
-
-      <Pressable
-        style={styles.primaryButton}
-        onPress={onCapture}
-        accessibilityRole="button"
-        accessibilityLabel={t.dashboard.capturePlot}
-      >
-        <Ionicons name="locate" size={20} color="#FFFFFF" />
-        <Text style={styles.primaryButtonText}>{t.dashboard.capturePlot}</Text>
-      </Pressable>
     </>
   );
 }
 
-function SuppliersScreen({ t }: { t: Translation }) {
+function SuppliersScreen({
+  state,
+  update,
+  t,
+}: {
+  state: PersistedState;
+  update: (recipe: (current: PersistedState) => PersistedState) => void;
+  t: Translation;
+}) {
+  const [name, setName] = useState("");
+  const [region, setRegion] = useState("");
+
+  function addSupplier() {
+    if (!name.trim() || !region.trim()) {
+      Alert.alert(t.alerts.required);
+      return;
+    }
+    const now = new Date().toISOString();
+    const supplier: Supplier = {
+      id: createUuid(),
+      name: name.trim(),
+      region: region.trim(),
+      producerCount: 0,
+      plotCount: 0,
+      updatedAt: now,
+      syncStatus: "pending",
+    };
+    update((current) => ({
+      ...current,
+      suppliers: [supplier, ...current.suppliers],
+      outbox: [
+        ...current.outbox,
+        {
+          id: createUuid(),
+          idempotencyKey: createUuid(),
+          entityType: "supplier",
+          entityId: supplier.id,
+          action: "upsert",
+          payload: supplier,
+          createdAt: now,
+          attempts: 0,
+        },
+      ],
+    }));
+    setName("");
+    setRegion("");
+    Alert.alert(t.alerts.saved);
+  }
+
   return (
     <>
-      <SectionTitle
-        eyebrow={t.suppliers.eyebrow}
-        title={t.suppliers.title}
-        description={t.suppliers.description}
-      />
-      {suppliers.map((supplier) => (
-        <View
-          key={supplier.id}
-          style={styles.card}
-          accessible
-          accessibilityLabel={`${t.accessibility.supplierCard} ${supplier.name}, ${t.suppliers.statuses[supplier.status]}`}
-        >
-          <View style={styles.cardHeader}>
-            <View style={styles.supplierIdentity}>
-              <View style={styles.initial}>
-                <Text style={styles.initialText}>{supplier.name[0]}</Text>
-              </View>
-              <View style={styles.flex}>
-                <Text style={styles.cardTitle}>{supplier.name}</Text>
-                <Text style={styles.caption}>
-                  {supplier.id} · {supplier.region}
-                </Text>
-              </View>
+      <Section title={t.suppliers.title} description={t.suppliers.description} />
+      <View style={styles.card}>
+        <Field label={t.common.name} value={name} onChangeText={setName} />
+        <Field label={t.common.region} value={region} onChangeText={setRegion} />
+        <Button label={t.suppliers.add} icon="person-add" onPress={addSupplier} />
+      </View>
+      {state.suppliers.length === 0 ? <Text style={styles.empty}>{t.suppliers.empty}</Text> : null}
+      {state.suppliers.map((supplier) => (
+        <View key={supplier.id} style={styles.card}>
+          <View style={styles.rowBetween}>
+            <View style={styles.flex}>
+              <Text style={styles.cardTitle}>{supplier.name}</Text>
+              <Text style={styles.caption}>{supplier.region} · {supplier.id}</Text>
             </View>
-            <Badge tone={supplier.tone}>{t.suppliers.statuses[supplier.status]}</Badge>
+            <Badge status={supplier.syncStatus} t={t} />
           </View>
-          <View style={styles.supplierStats}>
-            <View>
-              <Text style={styles.statValue}>{supplier.producers}</Text>
-              <Text style={styles.caption}>{t.suppliers.producers}</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View>
-              <Text style={styles.statValue}>{supplier.plots}</Text>
-              <Text style={styles.caption}>{t.suppliers.plots}</Text>
-            </View>
-          </View>
+          <Text style={styles.description}>
+            {supplier.producerCount} {t.suppliers.producerCount} · {supplier.plotCount} {t.suppliers.plotCount}
+          </Text>
         </View>
       ))}
     </>
   );
 }
 
-function CaptureScreen({
-  drafts,
-  onDraftSaved,
+function PlotsScreen({
+  state,
+  update,
   t,
 }: {
-  drafts: PlotDraft[];
-  onDraftSaved: (draft: PlotDraft) => void;
+  state: PersistedState;
+  update: (recipe: (current: PersistedState) => PersistedState) => void;
   t: Translation;
 }) {
   const [producer, setProducer] = useState("");
-  const [farmName, setFarmName] = useState("");
-  const [areaHa, setAreaHa] = useState("");
-  const [location, setLocation] = useState<Location.LocationObject | null>(null);
+  const [farm, setFarm] = useState("");
+  const [area, setArea] = useState("");
+  const [supplierId, setSupplierId] = useState("");
+  const [points, setPoints] = useState<Position[]>([]);
+  const [geoJsonText, setGeoJsonText] = useState("");
+  const [polygon, setPolygon] = useState<GeoJsonPolygon | null>(null);
   const [locating, setLocating] = useState(false);
 
-  async function captureLocation() {
+  function applyPolygonText(value = geoJsonText) {
+    try {
+      const next = parsePolygon(value);
+      setPolygon(next);
+      setPoints(next.coordinates[0].slice(0, -1));
+      setGeoJsonText(JSON.stringify(next, null, 2));
+    } catch {
+      Alert.alert(t.plots.invalidPolygon);
+    }
+  }
+
+  async function capturePoint() {
     setLocating(true);
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== "granted") {
-        Alert.alert(
-          t.capture.alerts.permissionTitle,
-          t.capture.alerts.permissionMessage,
-        );
+        Alert.alert(t.plots.permissionError);
         return;
       }
-
-      const result = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-      setLocation(result);
+      const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      const next: Position[] = [
+        ...points,
+        [location.coords.longitude, location.coords.latitude],
+      ];
+      setPoints(next);
+      if (next.length >= 3) {
+        const nextPolygon = closePolygon(next);
+        setPolygon(nextPolygon);
+        setGeoJsonText(JSON.stringify(nextPolygon, null, 2));
+      }
     } catch {
-      Alert.alert(
-        t.capture.alerts.unavailableTitle,
-        t.capture.alerts.unavailableMessage,
-      );
+      Alert.alert(t.plots.gpsError);
     } finally {
       setLocating(false);
     }
   }
 
-  function saveDraft() {
-    if (!producer.trim() || !farmName.trim() || !areaHa.trim() || !location) {
-      Alert.alert(
-        t.capture.alerts.incompleteTitle,
-        t.capture.alerts.incompleteMessage,
-      );
+  async function importGeoJson() {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ["application/geo+json", "application/json", "text/json"],
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled) return;
+    try {
+      const text = await fetch(result.assets[0].uri).then((response) => response.text());
+      setGeoJsonText(text);
+      applyPolygonText(text);
+    } catch {
+      Alert.alert(t.plots.invalidPolygon);
+    }
+  }
+
+  function savePlot() {
+    if (!producer.trim() || !farm.trim() || !area.trim() || !polygon) {
+      Alert.alert(t.alerts.required);
       return;
     }
-
-    const parsedArea = Number(areaHa.replace(",", "."));
+    const parsedArea = Number(area.replace(",", "."));
     if (!Number.isFinite(parsedArea) || parsedArea <= 0) {
-      Alert.alert(t.capture.alerts.invalidAreaTitle, t.capture.alerts.invalidAreaMessage);
+      Alert.alert(t.plots.invalidPolygon);
       return;
     }
-
-    const draft: PlotDraft = {
-      id: `PLOT-${Date.now()}`,
+    const now = new Date().toISOString();
+    const plot: Plot = {
+      id: createUuid(),
+      supplierId: supplierId.trim() || undefined,
       producer: producer.trim(),
-      farmName: farmName.trim(),
+      farmName: farm.trim(),
       areaHa: parsedArea.toFixed(2),
-      latitude: location.coords.latitude,
-      longitude: location.coords.longitude,
-      capturedAt: new Date().toISOString(),
-      syncStatus: "local",
+      polygon,
+      capturedAt: now,
+      updatedAt: now,
+      syncStatus: "pending",
     };
-    onDraftSaved(draft);
+    update((current) => ({
+      ...current,
+      plots: [plot, ...current.plots],
+      outbox: [
+        ...current.outbox,
+        {
+          id: createUuid(),
+          idempotencyKey: createUuid(),
+          entityType: "plot",
+          entityId: plot.id,
+          action: "upsert",
+          payload: plot,
+          createdAt: now,
+          attempts: 0,
+        },
+      ],
+    }));
     setProducer("");
-    setFarmName("");
-    setAreaHa("");
-    setLocation(null);
-    Alert.alert(
-      t.capture.alerts.savedTitle,
-      t.capture.alerts.savedMessage,
-    );
+    setFarm("");
+    setArea("");
+    setSupplierId("");
+    setPoints([]);
+    setPolygon(null);
+    setGeoJsonText("");
+    Alert.alert(t.alerts.saved);
   }
 
   return (
     <>
-      <SectionTitle
-        eyebrow={t.capture.eyebrow}
-        title={t.capture.title}
-        description={t.capture.description}
-      />
-
+      <Section title={t.plots.title} description={t.plots.description} />
       <View style={styles.card}>
-        <Text style={styles.inputLabel}>{t.capture.producer}</Text>
-        <TextInput
-          value={producer}
-          onChangeText={setProducer}
-          placeholder={t.capture.producerPlaceholder}
-          accessibilityLabel={t.capture.producer}
-          placeholderTextColor="#98A29C"
-          style={styles.input}
-        />
-
-        <Text style={styles.inputLabel}>{t.capture.farmName}</Text>
-        <TextInput
-          value={farmName}
-          onChangeText={setFarmName}
-          placeholder={t.capture.farmPlaceholder}
-          accessibilityLabel={t.capture.farmName}
-          placeholderTextColor="#98A29C"
-          style={styles.input}
-        />
-
-        <Text style={styles.inputLabel}>{t.capture.area}</Text>
-        <TextInput
-          value={areaHa}
-          onChangeText={setAreaHa}
-          placeholder={t.capture.areaPlaceholder}
-          accessibilityLabel={t.capture.area}
-          placeholderTextColor="#98A29C"
-          keyboardType="decimal-pad"
-          style={styles.input}
-        />
-
-        <View style={styles.locationBox}>
-          <View style={styles.locationIcon}>
-            <Ionicons
-              name={location ? "checkmark" : "location"}
-              size={21}
-              color={location ? palette.forest : palette.amber}
-            />
-          </View>
-          <View style={styles.flex}>
-            <Text style={styles.taskTitle}>
-              {location ? t.capture.gpsCaptured : t.capture.gpsMissing}
-            </Text>
-            <Text style={styles.taskDetail}>
-              {location
-                ? `${location.coords.latitude.toFixed(6)}, ${location.coords.longitude.toFixed(6)}`
-                : t.capture.gpsInstruction}
-            </Text>
-          </View>
-        </View>
-
-        <Pressable
-          style={styles.secondaryButton}
-          onPress={captureLocation}
+        <Field label={t.plots.producer} value={producer} onChangeText={setProducer} />
+        <Field label={t.plots.farm} value={farm} onChangeText={setFarm} />
+        <Field label={t.plots.area} value={area} onChangeText={setArea} keyboardType="decimal-pad" />
+        <Field label={t.plots.supplierId} value={supplierId} onChangeText={setSupplierId} />
+        <Text style={styles.caption}>{t.plots.pointCount}: {points.length}</Text>
+        <Button
+          label={locating ? "GPS ..." : t.plots.capturePoint}
+          icon="locate"
+          onPress={() => void capturePoint()}
+          secondary
           disabled={locating}
-          accessibilityRole="button"
-          accessibilityLabel={locating ? t.capture.locating : t.capture.captureGps}
-          accessibilityState={{ disabled: locating }}
-        >
-          <Ionicons name="locate" size={19} color={palette.forest} />
-          <Text style={styles.secondaryButtonText}>
-            {locating ? t.capture.locating : t.capture.captureGps}
-          </Text>
-        </Pressable>
-        <Pressable
-          style={styles.primaryButton}
-          onPress={saveDraft}
-          accessibilityRole="button"
-          accessibilityLabel={t.capture.saveDraft}
-        >
-          <Ionicons name="save" size={19} color="#FFFFFF" />
-          <Text style={styles.primaryButtonText}>{t.capture.saveDraft}</Text>
-        </Pressable>
+        />
+        <Button label={t.plots.importGeoJson} icon="document-attach" onPress={() => void importGeoJson()} secondary />
+        <Field
+          label={t.plots.polygonJson}
+          value={geoJsonText}
+          onChangeText={setGeoJsonText}
+          multiline
+          placeholder='{"type":"Polygon","coordinates":[...]}'
+        />
+        <Button label={t.plots.applyGeoJson} icon="checkmark-circle" onPress={() => applyPolygonText()} secondary />
+        <Button label={t.plots.saveDraft} icon="save" onPress={savePlot} />
       </View>
-
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <View>
-            <Text style={styles.eyebrow}>{t.capture.localData}</Text>
-            <Text style={styles.cardTitle}>{t.capture.savedDrafts}</Text>
-          </View>
-          <Badge>{String(drafts.length)}</Badge>
-        </View>
-        {drafts.length === 0 ? (
-          <Text style={styles.emptyText}>
-            {t.capture.noDrafts}
-          </Text>
-        ) : (
-          drafts.map((draft, index) => (
-            <View
-              key={draft.id}
-              style={[styles.task, index === drafts.length - 1 && styles.taskLast]}
-            >
-              <View style={styles.taskIcon}>
-                <Ionicons name="leaf" size={18} color={palette.forest} />
-              </View>
-              <View style={styles.taskCopy}>
-                <Text style={styles.taskTitle}>{draft.farmName}</Text>
-                <Text style={styles.taskDetail}>
-                  {draft.producer} · {draft.areaHa} ha · {t.capture.localOnly}
-                </Text>
-              </View>
-              <Ionicons name="cloud-offline" size={18} color={palette.amber} />
+      {state.plots.length === 0 ? <Text style={styles.empty}>{t.plots.empty}</Text> : null}
+      {state.plots.map((plot) => (
+        <View key={plot.id} style={styles.card}>
+          <View style={styles.rowBetween}>
+            <View style={styles.flex}>
+              <Text style={styles.cardTitle}>{plot.farmName}</Text>
+              <Text style={styles.caption}>{plot.producer} · {plot.areaHa} ha</Text>
             </View>
-          ))
-        )}
-      </View>
-    </>
-  );
-}
-
-function ShipmentsScreen({ t }: { t: Translation }) {
-  return (
-    <>
-      <SectionTitle
-        eyebrow={t.shipments.eyebrow}
-        title={t.shipments.title}
-        description={t.shipments.description}
-      />
-      {shipments.map((shipment) => (
-        <View
-          key={shipment.id}
-          style={styles.card}
-          accessible
-          accessibilityLabel={`${t.accessibility.shipmentCard} ${shipment.id}, ${t.shipments.statuses[shipment.status]}`}
-        >
-          <View style={styles.cardHeader}>
-            <View>
-              <Text style={styles.cardTitle}>{shipment.id}</Text>
-              <Text style={styles.caption}>{t.entities[shipment.product]}</Text>
-            </View>
-            <Badge tone={shipment.readiness === 100 ? "success" : "warning"}>
-              {t.shipments.statuses[shipment.status]}
-            </Badge>
+            <Badge status={plot.syncStatus} t={t} />
           </View>
-          <View style={styles.shipmentDetail}>
-            <View>
-              <Text style={styles.caption}>{t.shipments.origin}</Text>
-              <Text style={styles.detailValue}>{shipment.origin}, {t.shipments.ethiopia}</Text>
-            </View>
-            <View>
-              <Text style={styles.caption}>{t.shipments.quantity}</Text>
-              <Text style={styles.detailValue}>{shipment.quantity}</Text>
-            </View>
-          </View>
-          <View style={styles.progressHeader}>
-            <Text style={styles.caption}>{t.shipments.readiness}</Text>
-            <Text style={styles.progressValue}>{shipment.readiness}%</Text>
-          </View>
-          <View style={styles.progressTrack}>
-            <View
-              style={[styles.progressFill, { width: `${shipment.readiness}%` }]}
-            />
-          </View>
+          <Text style={styles.mono}>{JSON.stringify(plot.polygon)}</Text>
         </View>
       ))}
     </>
   );
 }
 
-function HelpScreen({ t }: { t: Translation }) {
+function OperationsScreen({
+  state,
+  update,
+  t,
+}: {
+  state: PersistedState;
+  update: (recipe: (current: PersistedState) => PersistedState) => void;
+  t: Translation;
+}) {
+  const [subjectId, setSubjectId] = useState("");
+  const configured = getApiBaseUrl() !== null;
+
+  function providerError(error: unknown): string {
+    if (error instanceof ApiError && error.code === "NOT_CONFIGURED") {
+      return t.operations.providerBlocked;
+    }
+    return error instanceof Error ? error.message : String(error);
+  }
+
+  async function pickAndUpload() {
+    if (!configured) {
+      Alert.alert(t.sync.notConfigured, t.operations.providerBlocked);
+      return;
+    }
+    const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    const localId = createUuid();
+    update((current) => ({
+      ...current,
+      documents: [{
+        id: localId,
+        fileName: asset.name,
+        mimeType: asset.mimeType ?? "application/octet-stream",
+        size: asset.size ?? 0,
+        status: "uploading",
+        createdAt: new Date().toISOString(),
+      }, ...current.documents],
+    }));
+    try {
+      const uploaded = await uploadDocument({
+        uri: asset.uri,
+        name: asset.name,
+        mimeType: asset.mimeType ?? "application/octet-stream",
+        size: asset.size ?? 0,
+        idempotencyKey: localId,
+      });
+      update((current) => ({
+        ...current,
+        documents: current.documents.map((document) =>
+          document.id === localId
+            ? { ...document, id: uploaded.id, status: "uploaded" }
+            : document,
+        ),
+      }));
+    } catch (error) {
+      update((current) => ({
+        ...current,
+        documents: current.documents.map((document) =>
+          document.id === localId ? { ...document, status: "failed" } : document,
+        ),
+      }));
+      Alert.alert(t.common.failed, providerError(error));
+    }
+  }
+
+  async function create(kind: OperationalRequest["kind"]) {
+    if (!subjectId.trim()) {
+      Alert.alert(t.alerts.required);
+      return;
+    }
+    if (!configured) {
+      Alert.alert(t.sync.notConfigured, t.operations.providerBlocked);
+      return;
+    }
+    try {
+      const result = await requestOperation(kind, subjectId.trim(), createUuid());
+      update((current) => ({ ...current, operations: [result, ...current.operations] }));
+    } catch (error) {
+      Alert.alert(t.common.failed, providerError(error));
+    }
+  }
+
+  async function refresh(operation: OperationalRequest) {
+    try {
+      const result = await getOperation(operation.kind, operation.id);
+      update((current) => ({
+        ...current,
+        operations: current.operations.map((item) => item.id === result.id ? result : item),
+      }));
+    } catch (error) {
+      Alert.alert(t.common.failed, providerError(error));
+    }
+  }
+
+  async function mutateDds(operation: OperationalRequest, action: "validate" | "submit") {
+    try {
+      const result = action === "validate"
+        ? await validateDds(operation.id, createUuid())
+        : await submitDds(operation.id, createUuid());
+      update((current) => ({
+        ...current,
+        operations: current.operations.map((item) => item.id === result.id ? result : item),
+      }));
+    } catch (error) {
+      Alert.alert(t.common.failed, providerError(error));
+    }
+  }
+
+  async function downloadAndShare(operation: OperationalRequest) {
+    if (!operation.downloadUrl) return;
+    try {
+      const destination = new File(Paths.cache, `evidence-${operation.id}.zip`);
+      const file = await File.downloadFileAsync(operation.downloadUrl, destination, { idempotent: true });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(file.uri);
+      } else {
+        Alert.alert(t.common.download, file.uri);
+      }
+    } catch (error) {
+      Alert.alert(t.common.failed, providerError(error));
+    }
+  }
+
   return (
     <>
-      <SectionTitle
-        eyebrow={t.help.eyebrow}
-        title={t.help.title}
-        description={t.help.intro}
-      />
-
+      <Section title={t.operations.title} />
+      {!configured ? (
+        <View style={styles.blocking}>
+          <Ionicons name="warning" size={23} color={palette.red} />
+          <View style={styles.flex}>
+            <Text style={styles.blockingTitle}>{t.sync.notConfigured}</Text>
+            <Text style={styles.description}>{t.sync.notConfiguredDetail}</Text>
+          </View>
+        </View>
+      ) : null}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>{t.help.guideTitle}</Text>
-        <View style={styles.guideSteps}>
-          {t.help.steps.map((step, index) => (
-            <View key={step} style={styles.guideStep}>
-              <View style={styles.guideNumber}>
-                <Text style={styles.guideNumberText}>{index + 1}</Text>
-              </View>
-              <Text style={styles.guideText}>{step}</Text>
+        <Text style={styles.cardTitle}>{t.operations.documents}</Text>
+        <Button label={t.operations.pickUpload} icon="cloud-upload" onPress={() => void pickAndUpload()} disabled={!configured} />
+        {state.documents.map((document) => (
+          <View key={document.id} style={styles.listRow}>
+            <View style={styles.flex}>
+              <Text style={styles.itemTitle}>{document.fileName}</Text>
+              <Text style={styles.caption}>{document.mimeType} · {document.size} B</Text>
             </View>
-          ))}
+            <Badge status={document.status} t={t} />
+          </View>
+        ))}
+      </View>
+      <View style={styles.card}>
+        <Field label={t.common.subjectId} value={subjectId} onChangeText={setSubjectId} />
+        <Text style={styles.cardTitle}>{t.operations.satellite}</Text>
+        <Button label={t.operations.requestSatellite} icon="planet" onPress={() => void create("satellite")} disabled={!configured} />
+        <Text style={styles.cardTitle}>{t.operations.evidence}</Text>
+        <Button label={t.operations.requestEvidence} icon="archive" onPress={() => void create("evidence_pack")} disabled={!configured} />
+        <Text style={styles.cardTitle}>{t.operations.dds}</Text>
+        <Button label={t.operations.createDds} icon="document-text" onPress={() => void create("dds")} disabled={!configured} />
+      </View>
+      {state.operations.length === 0 ? <Text style={styles.empty}>{t.operations.noItems}</Text> : null}
+      {state.operations.map((operation) => (
+        <View key={operation.id} style={styles.card}>
+          <View style={styles.rowBetween}>
+            <View style={styles.flex}>
+              <Text style={styles.cardTitle}>{operation.kind.replace("_", " ")}</Text>
+              <Text style={styles.caption}>{operation.subjectId} · {operation.id}</Text>
+            </View>
+            <Badge status={operation.status} t={t} />
+          </View>
+          {operation.status === "not_configured" ? (
+            <Text style={styles.errorText}>{t.operations.providerBlocked}</Text>
+          ) : null}
+          {operation.message ? <Text style={styles.description}>{operation.message}</Text> : null}
+          <Button label={t.operations.checkStatus} icon="refresh" onPress={() => void refresh(operation)} secondary />
+          {operation.kind === "dds" ? (
+            <View style={styles.buttonRow}>
+              <Button label={t.operations.validateDds} icon="checkmark" onPress={() => void mutateDds(operation, "validate")} secondary />
+              <Button label={t.operations.submitDds} icon="send" onPress={() => void mutateDds(operation, "submit")} />
+            </View>
+          ) : null}
+          {operation.kind === "evidence_pack" && operation.downloadUrl ? (
+            <Button label={`${t.common.download} / ${t.common.share}`} icon="share" onPress={() => void downloadAndShare(operation)} />
+          ) : null}
         </View>
-      </View>
-
-      <View style={styles.privacyCard}>
-        <Ionicons name="shield-checkmark" size={25} color={palette.forest} />
-        <View style={styles.flex}>
-          <Text style={styles.taskTitle}>{t.help.privacyTitle}</Text>
-          <Text style={styles.taskDetail}>{t.help.privacy}</Text>
-        </View>
-      </View>
-
-      <View style={styles.prototypeNotice}>
-        <Ionicons name="flask" size={20} color={palette.amber} />
-        <Text style={styles.prototypeText}>
-          {t.help.prototype}
-        </Text>
-      </View>
+      ))}
     </>
+  );
+}
+
+function ConflictCard({
+  conflict,
+  resolve,
+  t,
+}: {
+  conflict: SyncConflict;
+  resolve: (conflict: SyncConflict, choice: "local" | "remote") => void;
+  t: Translation;
+}) {
+  return (
+    <View style={styles.conflictCard}>
+      <Text style={styles.blockingTitle}>{t.common.conflict}: {conflict.entityType}</Text>
+      <Text style={styles.caption}>{conflict.entityId}</Text>
+      <Text style={styles.mono}>Local: {JSON.stringify(conflict.local)}</Text>
+      <Text style={styles.mono}>Server: {JSON.stringify(conflict.remote)}</Text>
+      <View style={styles.buttonRow}>
+        <Button label={t.sync.keepLocal} icon="phone-portrait" onPress={() => resolve(conflict, "local")} secondary />
+        <Button label={t.sync.useServer} icon="cloud" onPress={() => resolve(conflict, "remote")} />
+      </View>
+    </View>
   );
 }
 
@@ -612,57 +666,31 @@ function LanguageChooser({
   t: Translation;
 }) {
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-      accessibilityViewIsModal
-    >
-      <View style={styles.modalBackdrop} accessibilityViewIsModal>
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={onClose}
-          accessibilityRole="button"
-          accessibilityLabel={t.accessibility.dismissLanguageChooser}
-        />
-        <View style={styles.languageDialog}>
-          <View style={styles.dialogHeader}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.modal}>
+        <View style={styles.dialog}>
+          <View style={styles.rowBetween}>
             <View style={styles.flex}>
-              <Text style={styles.cardTitle}>{t.languageChooserTitle}</Text>
-              <Text style={styles.taskDetail}>{t.languageChooserHint}</Text>
+              <Text style={styles.cardTitle}>{t.chooseLanguage}</Text>
+              <Text style={styles.description}>{t.languageHint}</Text>
             </View>
-            <Pressable
-              onPress={onClose}
-              style={styles.iconButton}
-              accessibilityRole="button"
-              accessibilityLabel={t.close}
-            >
-              <Ionicons name="close" size={22} color={palette.ink} />
+            <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={t.close}>
+              <Ionicons name="close" size={25} color={palette.ink} />
             </Pressable>
           </View>
-          {languages.map((item) => {
-            const option = translations[item];
-            const selected = language === item;
-            return (
-              <Pressable
-                key={item}
-                onPress={() => onSelect(item)}
-                style={[styles.languageOption, selected && styles.languageOptionActive]}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: selected }}
-                accessibilityLabel={option.languageName}
-              >
-                <Text style={[styles.languageCode, selected && styles.languageOptionTextActive]}>
-                  {option.languageCode}
-                </Text>
-                <Text style={[styles.languageName, selected && styles.languageOptionTextActive]}>
-                  {option.languageName}
-                </Text>
-                {selected ? <Ionicons name="checkmark" size={20} color="#FFFFFF" /> : null}
-              </Pressable>
-            );
-          })}
+          {languages.map((item) => (
+            <Pressable
+              key={item}
+              onPress={() => onSelect(item)}
+              style={[styles.language, item === language && styles.languageActive]}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: item === language }}
+            >
+              <Text style={[styles.itemTitle, item === language && styles.languageText]}>
+                {translations[item].languageCode} · {translations[item].languageName}
+              </Text>
+            </Pressable>
+          ))}
         </View>
       </View>
     </Modal>
@@ -672,132 +700,106 @@ function LanguageChooser({
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [language, setLanguage] = useState<Language>("de");
-  const [languageLoaded, setLanguageLoaded] = useState(false);
-  const [languageChooserOpen, setLanguageChooserOpen] = useState(false);
-  const [drafts, setDrafts] = useState<PlotDraft[]>([]);
-  const [storageLoaded, setStorageLoaded] = useState(false);
-  const languageChosen = useRef(false);
-  const selectedLanguage = useRef<Language>("de");
+  const [languageOpen, setLanguageOpen] = useState(false);
+  const [state, setState] = useState<PersistedState | null>(null);
+  const [online, setOnline] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const persistReady = useRef(false);
   const t = translations[language];
+  const configured = getApiBaseUrl() !== null;
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadPersistedState() {
-      let startupLanguage: Language = "de";
-
-      try {
-        const storedLanguage = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
-        if (isLanguage(storedLanguage)) {
-          startupLanguage = storedLanguage;
-        }
-      } catch {
-        // German remains the safe startup fallback if the preference cannot be read.
-      }
-
-      if (!cancelled) {
-        if (!languageChosen.current) {
-          selectedLanguage.current = startupLanguage;
-          setLanguage(startupLanguage);
-        }
-        setLanguageLoaded(true);
-      }
-
-      try {
-        const stored = await AsyncStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          if (!cancelled) {
-            setDrafts(JSON.parse(stored) as PlotDraft[]);
-          }
-        }
-      } catch {
-        if (cancelled) {
-          return;
-        }
-        const startupTranslation = translations[selectedLanguage.current];
-        Alert.alert(
-          startupTranslation.capture.alerts.readErrorTitle,
-          startupTranslation.capture.alerts.readErrorMessage,
-        );
-      } finally {
-        if (!cancelled) {
-          setStorageLoaded(true);
-        }
-      }
-    }
-
-    void loadPersistedState();
+    let active = true;
+    void Promise.all([AsyncStorage.getItem(LANGUAGE_STORAGE_KEY), loadState()])
+      .then(([storedLanguage, storedState]) => {
+        if (!active) return;
+        if (isLanguage(storedLanguage)) setLanguage(storedLanguage);
+        setState(storedState);
+        persistReady.current = true;
+      })
+      .catch(() => Alert.alert(translations.de.alerts.storageError));
+    const unsubscribe = NetInfo.addEventListener((network) => {
+      setOnline(Boolean(network.isConnected && network.isInternetReachable !== false));
+    });
     return () => {
-      cancelled = true;
+      active = false;
+      unsubscribe();
     };
   }, []);
 
   useEffect(() => {
-    if (!storageLoaded) {
+    if (!state || !persistReady.current) return;
+    void saveState(state).catch(() => Alert.alert(t.alerts.storageError));
+  }, [state, t.alerts.storageError]);
+
+  function update(recipe: (current: PersistedState) => PersistedState) {
+    setState((current) => current ? recipe(current) : current);
+  }
+
+  async function syncNow() {
+    if (!state || syncing) return;
+    if (!configured) {
+      setSyncError(t.sync.notConfiguredDetail);
       return;
     }
+    setSyncing(true);
+    setSyncError(null);
+    const result = await synchronize(state, true);
+    setState(result.state);
+    if (result.error) setSyncError(result.error.message);
+    setSyncing(false);
+  }
 
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(drafts)).catch(() => {
-      Alert.alert(
-        t.capture.alerts.saveErrorTitle,
-        t.capture.alerts.saveErrorMessage,
+  function resolveConflict(conflict: SyncConflict, choice: "local" | "remote") {
+    update((current) => {
+      const selected = choice === "local" ? conflict.local : conflict.remote;
+      const now = new Date().toISOString();
+      const remainingOutbox = current.outbox.filter(
+        (item) =>
+          item.entityType !== conflict.entityType || item.entityId !== conflict.entityId,
       );
-    });
-  }, [drafts, storageLoaded, t.capture.alerts.saveErrorMessage, t.capture.alerts.saveErrorTitle]);
-
-  function selectLanguage(nextLanguage: Language) {
-    languageChosen.current = true;
-    selectedLanguage.current = nextLanguage;
-    setLanguage(nextLanguage);
-    setLanguageChooserOpen(false);
-    AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, nextLanguage).catch(() => {
-      const nextTranslation = translations[nextLanguage];
-      Alert.alert(
-        nextTranslation.languageSaveErrorTitle,
-        nextTranslation.languageSaveErrorMessage,
-      );
+      const base = {
+        ...current,
+        conflicts: current.conflicts.filter((item) => item.id !== conflict.id),
+        outbox: remainingOutbox,
+      };
+      if (conflict.entityType === "supplier") {
+        const supplier = { ...(selected as Supplier), syncStatus: choice === "local" ? "pending" as const : "synced" as const };
+        return {
+          ...base,
+          suppliers: current.suppliers.map((item) => item.id === supplier.id ? supplier : item),
+          outbox: choice === "local" ? [...remainingOutbox, {
+            id: createUuid(), idempotencyKey: createUuid(), entityType: "supplier" as const,
+            entityId: supplier.id, action: "upsert" as const, payload: supplier, createdAt: now, attempts: 0,
+          }] : remainingOutbox,
+        };
+      }
+      const plot = { ...(selected as Plot), syncStatus: choice === "local" ? "pending" as const : "synced" as const };
+      return {
+        ...base,
+        plots: current.plots.map((item) => item.id === plot.id ? plot : item),
+        outbox: choice === "local" ? [...remainingOutbox, {
+          id: createUuid(), idempotencyKey: createUuid(), entityType: "plot" as const,
+          entityId: plot.id, action: "upsert" as const, payload: plot, createdAt: now, attempts: 0,
+        }] : remainingOutbox,
+      };
     });
   }
 
   const screen = useMemo(() => {
-    switch (activeTab) {
-      case "suppliers":
-        return <SuppliersScreen t={t} />;
-      case "capture":
-        return (
-          <CaptureScreen
-            drafts={drafts}
-            onDraftSaved={(draft) => setDrafts((current) => [draft, ...current])}
-            t={t}
-          />
-        );
-      case "shipments":
-        return <ShipmentsScreen t={t} />;
-      case "help":
-        return <HelpScreen t={t} />;
-      default:
-        return (
-          <HomeScreen
-            drafts={drafts}
-            onCapture={() => setActiveTab("capture")}
-            t={t}
-          />
-        );
-    }
-  }, [activeTab, drafts, t]);
+    if (!state) return null;
+    if (activeTab === "suppliers") return <SuppliersScreen state={state} update={update} t={t} />;
+    if (activeTab === "plots") return <PlotsScreen state={state} update={update} t={t} />;
+    if (activeTab === "operations") return <OperationsScreen state={state} update={update} t={t} />;
+    if (activeTab === "help") return <Section title={t.help.title} description={t.help.body} />;
+    return <HomeScreen state={state} t={t} />;
+  }, [activeTab, state, t]);
 
-  if (!languageLoaded) {
+  if (!state) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <StatusBar style="light" />
-        <View
-          style={styles.loading}
-          accessible
-          accessibilityRole="progressbar"
-          accessibilityLabel="SCTracker"
-        >
-          <ActivityIndicator size="large" color={palette.lime} />
-        </View>
+        <ActivityIndicator style={styles.loader} size="large" color={palette.lime} />
       </SafeAreaView>
     );
   }
@@ -805,78 +807,88 @@ export default function App() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
-      <View style={styles.appHeader}>
-        <View style={styles.brandMark}>
-          <Text style={styles.brandMarkText}>SC</Text>
-        </View>
+      <View style={styles.header}>
+        <View style={styles.logo}><Text style={styles.logoText}>SC</Text></View>
         <View style={styles.flex}>
           <Text style={styles.brand}>SCTracker</Text>
-          <Text style={styles.brandSubtitle}>{t.brandSubtitle}</Text>
+          <Text style={styles.headerSub}>{t.brandSubtitle}</Text>
         </View>
-        <View style={styles.offlinePill}>
-          <View style={styles.offlineDot} />
-          <Text style={styles.offlineText}>{t.offlineReady}</Text>
+        <View style={[styles.connectivity, !configured && styles.connectivityBlocked]}>
+          <View style={[styles.dot, !online && styles.dotOffline]} />
+          <Text style={styles.connectivityText}>
+            {!configured ? t.sync.notConfigured : online ? t.sync.online : t.sync.offline}
+          </Text>
         </View>
         <Pressable
-          style={styles.headerLanguageButton}
-          onPress={() => setLanguageChooserOpen(true)}
+          style={styles.languageButton}
+          onPress={() => setLanguageOpen(true)}
           accessibilityRole="button"
-          accessibilityLabel={t.accessibility.chooseLanguage}
-          accessibilityHint={t.accessibility.currentLanguage}
+          accessibilityLabel={t.chooseLanguage}
         >
-          <Ionicons name="language" size={21} color="#FFFFFF" />
-          <Text style={styles.headerLanguageCode}>{t.languageCode}</Text>
+          <Ionicons name="language" size={20} color="#FFFFFF" />
+          <Text style={styles.languageCode}>{t.languageCode}</Text>
         </Pressable>
       </View>
-
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-      >
+      <View style={styles.syncBar}>
+        <Text style={[styles.syncText, syncError && styles.errorText]} numberOfLines={2}>
+          {syncing ? t.sync.syncing : syncError ?? `${state.outbox.length} ${t.sync.queued}`}
+        </Text>
+        <Button
+          label={syncing ? t.sync.syncing : syncError ? t.common.retry : t.sync.syncNow}
+          icon={syncError ? "refresh" : "cloud-upload"}
+          onPress={() => void syncNow()}
+          secondary
+          disabled={syncing || !online || !configured}
+        />
+      </View>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {!configured ? (
+          <View style={styles.blocking}>
+            <Ionicons name="warning" size={23} color={palette.red} />
+            <View style={styles.flex}>
+              <Text style={styles.blockingTitle}>{t.sync.notConfigured}</Text>
+              <Text style={styles.description}>{t.sync.notConfiguredDetail}</Text>
+            </View>
+          </View>
+        ) : null}
+        {state.conflicts.length > 0 ? (
+          <Section title={t.sync.conflicts}>
+            {state.conflicts.map((conflict) => (
+              <ConflictCard key={conflict.id} conflict={conflict} resolve={resolveConflict} t={t} />
+            ))}
+          </Section>
+        ) : null}
         {screen}
       </ScrollView>
-
-      <View style={styles.tabBar}>
-        <TabButton
-          active={activeTab === "home"}
-          icon="home"
-          label={t.tabs.home}
-          onPress={() => setActiveTab("home")}
-        />
-        <TabButton
-          active={activeTab === "suppliers"}
-          icon="people"
-          label={t.tabs.suppliers}
-          onPress={() => setActiveTab("suppliers")}
-        />
-        <Pressable
-          style={styles.captureTab}
-          onPress={() => setActiveTab("capture")}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: activeTab === "capture" }}
-          accessibilityLabel={t.tabs.capture}
-        >
-          <Ionicons name="locate" size={25} color="#FFFFFF" />
-        </Pressable>
-        <TabButton
-          active={activeTab === "shipments"}
-          icon="cube"
-          label={t.tabs.shipments}
-          onPress={() => setActiveTab("shipments")}
-        />
-        <TabButton
-          active={activeTab === "help"}
-          icon="help-circle"
-          label={t.tabs.help}
-          onPress={() => setActiveTab("help")}
-        />
+      <View style={styles.tabs}>
+        {([
+          ["home", "home", t.tabs.home],
+          ["suppliers", "people", t.tabs.suppliers],
+          ["plots", "map", t.tabs.plots],
+          ["operations", "briefcase", t.tabs.operations],
+          ["help", "help-circle", t.tabs.help],
+        ] as const).map(([tab, icon, label]) => (
+          <Pressable
+            key={tab}
+            onPress={() => setActiveTab(tab)}
+            style={styles.tab}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeTab === tab }}
+          >
+            <Ionicons name={activeTab === tab ? icon : `${icon}-outline`} size={21} color={activeTab === tab ? palette.forest : palette.muted} />
+            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]} numberOfLines={1}>{label}</Text>
+          </Pressable>
+        ))}
       </View>
       <LanguageChooser
-        visible={languageChooserOpen}
+        visible={languageOpen}
         language={language}
-        onSelect={selectLanguage}
-        onClose={() => setLanguageChooserOpen(false)}
+        onClose={() => setLanguageOpen(false)}
+        onSelect={(next) => {
+          setLanguage(next);
+          setLanguageOpen(false);
+          void AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, next).catch(() => Alert.alert(translations[next].alerts.storageError));
+        }}
         t={t}
       />
     </SafeAreaView>
@@ -884,574 +896,69 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    paddingTop: Platform.OS === "android" ? NativeStatusBar.currentHeight : 0,
-    backgroundColor: palette.ink,
-  },
-  loading: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  appHeader: {
-    minHeight: 70,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 11,
-    paddingHorizontal: 18,
-    backgroundColor: palette.ink,
-  },
-  brandMark: {
-    width: 38,
-    height: 38,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 11,
-    backgroundColor: palette.lime,
-  },
-  brandMarkText: {
-    color: palette.ink,
-    fontSize: 14,
-    fontWeight: "900",
-  },
-  brand: {
-    color: "#FFFFFF",
-    fontSize: 17,
-    fontWeight: "800",
-  },
-  brandSubtitle: {
-    marginTop: 1,
-    color: "#9DB0A6",
-    fontSize: 10,
-  },
-  offlinePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-  offlineDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: palette.lime,
-  },
-  offlineText: {
-    color: "#D9E2DC",
-    fontSize: 9,
-    fontWeight: "700",
-  },
-  headerLanguageButton: {
-    minWidth: 45,
-    minHeight: 42,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 3,
-    borderRadius: 10,
-    backgroundColor: "rgba(255,255,255,0.1)",
-  },
-  headerLanguageCode: {
-    color: "#FFFFFF",
-    fontSize: 9,
-    fontWeight: "800",
-  },
-  scroll: {
-    flex: 1,
-    backgroundColor: palette.paper,
-  },
-  content: {
-    gap: 14,
-    padding: 17,
-    paddingBottom: 28,
-  },
-  hero: {
-    minHeight: 205,
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 23,
-    borderRadius: 22,
-    backgroundColor: palette.forestDark,
-  },
-  heroCopy: {
-    flex: 1,
-    paddingRight: 12,
-  },
-  heroEyebrow: {
-    marginBottom: 9,
-    color: palette.lime,
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 1.3,
-  },
-  heroTitle: {
-    color: "#FFFFFF",
-    fontFamily: Platform.select({ ios: "Georgia", android: "serif" }),
-    fontSize: 25,
-    fontWeight: "700",
-  },
-  heroText: {
-    marginTop: 7,
-    color: "#CED9D2",
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  heroTags: {
-    flexDirection: "row",
-    gap: 7,
-    marginTop: 18,
-  },
-  heroTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    overflow: "hidden",
-    borderRadius: 6,
-    color: "#EFF3F0",
-    backgroundColor: "rgba(255,255,255,0.08)",
-    fontSize: 9,
-    fontWeight: "700",
-  },
-  score: {
-    width: 80,
-    height: 80,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 6,
-    borderColor: palette.lime,
-    borderRadius: 40,
-  },
-  scoreValue: {
-    color: "#FFFFFF",
-    fontFamily: Platform.select({ ios: "Georgia", android: "serif" }),
-    fontSize: 21,
-    fontWeight: "700",
-  },
-  scoreLabel: {
-    color: "#C6D4CC",
-    fontSize: 8,
-  },
-  metricRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  metricCard: {
-    flex: 1,
-    minHeight: 122,
-    padding: 17,
-    borderWidth: 1,
-    borderColor: palette.line,
-    borderRadius: 15,
-    backgroundColor: palette.panel,
-  },
-  metricValue: {
-    marginTop: 12,
-    color: palette.ink,
-    fontFamily: Platform.select({ ios: "Georgia", android: "serif" }),
-    fontSize: 24,
-    fontWeight: "700",
-  },
-  metricLabel: {
-    marginTop: 3,
-    color: palette.muted,
-    fontSize: 10,
-  },
-  card: {
-    padding: 18,
-    borderWidth: 1,
-    borderColor: palette.line,
-    borderRadius: 15,
-    backgroundColor: palette.panel,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 10,
-    marginBottom: 14,
-  },
-  eyebrow: {
-    marginBottom: 5,
-    color: palette.forest,
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 1.25,
-  },
-  cardTitle: {
-    color: palette.ink,
-    fontFamily: Platform.select({ ios: "Georgia", android: "serif" }),
-    fontSize: 17,
-    fontWeight: "700",
-  },
-  task: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 11,
-    paddingVertical: 13,
-    borderBottomWidth: 1,
-    borderBottomColor: palette.line,
-  },
-  taskLast: {
-    borderBottomWidth: 0,
-    paddingBottom: 0,
-  },
-  taskIcon: {
-    width: 35,
-    height: 35,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 10,
-    backgroundColor: palette.paper,
-  },
-  taskCopy: {
-    flex: 1,
-  },
-  taskTitle: {
-    color: palette.ink,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  taskDetail: {
-    marginTop: 3,
-    color: palette.muted,
-    fontSize: 10,
-    lineHeight: 15,
-  },
-  primaryButton: {
-    minHeight: 50,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 9,
-    marginTop: 1,
-    borderRadius: 11,
-    backgroundColor: palette.forest,
-  },
-  primaryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  secondaryButton: {
-    minHeight: 48,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: palette.forest,
-    borderRadius: 11,
-    backgroundColor: "#FFFFFF",
-  },
-  secondaryButtonText: {
-    color: palette.forest,
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  badge: {
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    borderRadius: 7,
-    backgroundColor: "#E9EBE7",
-  },
-  badgeSuccess: {
-    backgroundColor: palette.softGreen,
-  },
-  badgeWarning: {
-    backgroundColor: palette.softAmber,
-  },
-  badgeText: {
-    color: palette.muted,
-    fontSize: 9,
-    fontWeight: "800",
-  },
-  badgeTextSuccess: {
-    color: palette.forest,
-  },
-  badgeTextWarning: {
-    color: "#83530C",
-  },
-  sectionTitle: {
-    marginBottom: 7,
-    paddingTop: 4,
-  },
-  heading: {
-    color: palette.ink,
-    fontFamily: Platform.select({ ios: "Georgia", android: "serif" }),
-    fontSize: 28,
-    fontWeight: "700",
-  },
-  description: {
-    marginTop: 8,
-    color: palette.muted,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  supplierIdentity: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 11,
-  },
-  initial: {
-    width: 42,
-    height: 42,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 12,
-    backgroundColor: palette.softGreen,
-  },
-  initialText: {
-    color: palette.forest,
-    fontSize: 17,
-    fontWeight: "900",
-  },
-  flex: {
-    flex: 1,
-  },
-  caption: {
-    marginTop: 4,
-    color: palette.muted,
-    fontSize: 9,
-  },
-  supplierStats: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 22,
-    paddingTop: 13,
-    borderTopWidth: 1,
-    borderTopColor: palette.line,
-  },
-  statValue: {
-    color: palette.ink,
-    fontSize: 18,
-    fontWeight: "800",
-  },
-  statDivider: {
-    width: 1,
-    height: 31,
-    backgroundColor: palette.line,
-  },
-  inputLabel: {
-    marginBottom: 6,
-    color: palette.ink,
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  input: {
-    minHeight: 48,
-    marginBottom: 15,
-    paddingHorizontal: 13,
-    borderWidth: 1,
-    borderColor: palette.line,
-    borderRadius: 10,
-    color: palette.ink,
-    backgroundColor: "#FFFFFF",
-    fontSize: 13,
-  },
-  locationBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 11,
-    marginBottom: 13,
-    padding: 13,
-    borderRadius: 11,
-    backgroundColor: palette.paper,
-  },
-  locationIcon: {
-    width: 38,
-    height: 38,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 19,
-    backgroundColor: "#FFFFFF",
-  },
-  emptyText: {
-    paddingVertical: 12,
-    color: palette.muted,
-    fontSize: 11,
-    textAlign: "center",
-  },
-  shipmentDetail: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-    paddingVertical: 13,
-    borderTopWidth: 1,
-    borderTopColor: palette.line,
-  },
-  detailValue: {
-    marginTop: 4,
-    color: palette.ink,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  progressHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 8,
-  },
-  progressValue: {
-    color: palette.forest,
-    fontSize: 10,
-    fontWeight: "800",
-  },
-  progressTrack: {
-    height: 8,
-    marginTop: 8,
-    overflow: "hidden",
-    borderRadius: 4,
-    backgroundColor: "#E5E7E1",
-  },
-  progressFill: {
-    height: "100%",
-    borderRadius: 4,
-    backgroundColor: palette.forest,
-  },
-  modalBackdrop: {
-    flex: 1,
-    justifyContent: "center",
-    padding: 24,
-    backgroundColor: "rgba(10,25,18,0.62)",
-  },
-  languageDialog: {
-    gap: 9,
-    padding: 20,
-    borderRadius: 18,
-    backgroundColor: palette.panel,
-  },
-  dialogHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-    marginBottom: 8,
-  },
-  iconButton: {
-    width: 42,
-    height: 42,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 21,
-    backgroundColor: palette.paper,
-  },
-  languageOption: {
-    minHeight: 52,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: palette.line,
-    borderRadius: 11,
-    backgroundColor: "#FFFFFF",
-  },
-  languageOptionActive: {
-    borderColor: palette.forest,
-    backgroundColor: palette.forest,
-  },
-  languageCode: {
-    width: 36,
-    color: palette.forest,
-    fontSize: 11,
-    fontWeight: "900",
-  },
-  languageName: {
-    flex: 1,
-    color: palette.ink,
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  languageOptionTextActive: {
-    color: "#FFFFFF",
-  },
-  guideSteps: {
-    gap: 15,
-    marginTop: 20,
-  },
-  guideStep: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  guideNumber: {
-    width: 28,
-    height: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 14,
-    backgroundColor: palette.softGreen,
-  },
-  guideNumberText: {
-    color: palette.forest,
-    fontSize: 11,
-    fontWeight: "900",
-  },
-  guideText: {
-    flex: 1,
-    paddingTop: 4,
-    color: palette.ink,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  privacyCard: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-    padding: 18,
-    borderRadius: 15,
-    backgroundColor: palette.softGreen,
-  },
-  prototypeNotice: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    padding: 12,
-  },
-  prototypeText: {
-    color: palette.muted,
-    fontSize: 9,
-    fontWeight: "700",
-  },
-  tabBar: {
-    minHeight: 72,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-around",
-    paddingHorizontal: 8,
-    paddingBottom: Platform.OS === "ios" ? 9 : 4,
-    borderTopWidth: 1,
-    borderTopColor: palette.line,
-    backgroundColor: palette.panel,
-  },
-  tabButton: {
-    width: 62,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 3,
-  },
-  tabLabel: {
-    color: palette.muted,
-    fontSize: 8,
-    fontWeight: "600",
-  },
-  tabLabelActive: {
-    color: palette.forest,
-    fontWeight: "800",
-  },
-  captureTab: {
-    width: 52,
-    height: 52,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: -23,
-    borderWidth: 4,
-    borderColor: palette.panel,
-    borderRadius: 26,
-    backgroundColor: palette.forest,
-  },
+  safeArea: { flex: 1, paddingTop: Platform.OS === "android" ? NativeStatusBar.currentHeight : 0, backgroundColor: palette.ink },
+  loader: { flex: 1 },
+  header: { minHeight: 68, flexDirection: "row", alignItems: "center", gap: 9, paddingHorizontal: 14, backgroundColor: palette.ink },
+  logo: { width: 38, height: 38, alignItems: "center", justifyContent: "center", borderRadius: 11, backgroundColor: palette.lime },
+  logoText: { color: palette.ink, fontWeight: "900" },
+  brand: { color: "#FFFFFF", fontSize: 17, fontWeight: "800" },
+  headerSub: { color: "#AFC0B7", fontSize: 9 },
+  flex: { flex: 1 },
+  connectivity: { maxWidth: 100, flexDirection: "row", alignItems: "center", gap: 5, padding: 7, borderRadius: 9, backgroundColor: "rgba(255,255,255,0.1)" },
+  connectivityBlocked: { backgroundColor: "rgba(166,69,54,0.35)" },
+  connectivityText: { flexShrink: 1, color: "#FFFFFF", fontSize: 8, fontWeight: "700" },
+  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: palette.lime },
+  dotOffline: { backgroundColor: palette.amber },
+  languageButton: { minWidth: 45, height: 40, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 3, borderRadius: 9, backgroundColor: "rgba(255,255,255,0.1)" },
+  languageCode: { color: "#FFFFFF", fontSize: 8, fontWeight: "800" },
+  syncBar: { minHeight: 52, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, backgroundColor: palette.softGreen },
+  syncText: { flex: 1, color: palette.forest, fontSize: 10, fontWeight: "700" },
+  scroll: { flex: 1, backgroundColor: palette.paper },
+  content: { gap: 13, padding: 15, paddingBottom: 28 },
+  section: { gap: 8, marginBottom: 3 },
+  heading: { color: palette.ink, fontFamily: Platform.select({ ios: "Georgia", android: "serif" }), fontSize: 25, fontWeight: "700" },
+  description: { color: palette.muted, fontSize: 11, lineHeight: 17 },
+  hero: { gap: 12, padding: 21, borderRadius: 18, backgroundColor: palette.dark },
+  heroTitle: { color: "#FFFFFF", fontSize: 25, fontWeight: "800" },
+  heroBody: { color: "#D7E1DB", fontSize: 12, lineHeight: 19 },
+  metrics: { flexDirection: "row", gap: 8 },
+  metric: { flex: 1, padding: 10, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.09)" },
+  metricValue: { color: palette.lime, fontSize: 21, fontWeight: "900" },
+  metricLabel: { color: "#FFFFFF", fontSize: 9 },
+  card: { gap: 10, padding: 16, borderWidth: 1, borderColor: palette.line, borderRadius: 14, backgroundColor: palette.panel },
+  cardTitle: { color: palette.ink, fontSize: 16, fontWeight: "800" },
+  itemTitle: { color: palette.ink, fontSize: 12, fontWeight: "700" },
+  caption: { color: palette.muted, fontSize: 9, lineHeight: 14 },
+  label: { marginBottom: 5, color: palette.ink, fontSize: 10, fontWeight: "700" },
+  input: { minHeight: 45, paddingHorizontal: 12, borderWidth: 1, borderColor: palette.line, borderRadius: 9, color: palette.ink, backgroundColor: "#FFFFFF", fontSize: 12 },
+  textArea: { minHeight: 130, paddingTop: 10, fontFamily: Platform.select({ ios: "Menlo", android: "monospace" }), textAlignVertical: "top" },
+  button: { minHeight: 45, flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, paddingHorizontal: 10, borderRadius: 9, backgroundColor: palette.forest },
+  buttonSecondary: { borderWidth: 1, borderColor: palette.forest, backgroundColor: "#FFFFFF" },
+  buttonDisabled: { opacity: 0.45 },
+  buttonText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800", textAlign: "center" },
+  buttonTextSecondary: { color: palette.forest },
+  buttonRow: { flexDirection: "row", gap: 8 },
+  rowBetween: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 9 },
+  listRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 9, borderTopWidth: 1, borderTopColor: palette.line },
+  empty: { padding: 18, color: palette.muted, textAlign: "center" },
+  badge: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 7, backgroundColor: palette.softAmber },
+  badgeGood: { backgroundColor: palette.softGreen },
+  badgeBad: { backgroundColor: palette.softRed },
+  badgeText: { color: "#83530C", fontSize: 8, fontWeight: "800" },
+  goodText: { color: palette.forest },
+  badText: { color: palette.red },
+  blocking: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 14, borderWidth: 1, borderColor: palette.red, borderRadius: 12, backgroundColor: palette.softRed },
+  blockingTitle: { color: palette.red, fontSize: 12, fontWeight: "900" },
+  conflictCard: { gap: 8, padding: 13, borderWidth: 1, borderColor: palette.red, borderRadius: 10, backgroundColor: palette.softRed },
+  errorText: { color: palette.red, fontSize: 10, fontWeight: "700" },
+  mono: { color: palette.muted, fontFamily: Platform.select({ ios: "Menlo", android: "monospace" }), fontSize: 8, lineHeight: 12 },
+  tabs: { minHeight: 70, flexDirection: "row", alignItems: "center", borderTopWidth: 1, borderTopColor: palette.line, backgroundColor: palette.panel },
+  tab: { flex: 1, alignItems: "center", gap: 3, paddingHorizontal: 2 },
+  tabText: { color: palette.muted, fontSize: 7, fontWeight: "600" },
+  tabTextActive: { color: palette.forest, fontWeight: "900" },
+  modal: { flex: 1, justifyContent: "center", padding: 24, backgroundColor: "rgba(10,25,18,0.65)" },
+  dialog: { gap: 9, padding: 19, borderRadius: 16, backgroundColor: palette.panel },
+  language: { minHeight: 48, justifyContent: "center", paddingHorizontal: 13, borderWidth: 1, borderColor: palette.line, borderRadius: 9 },
+  languageActive: { borderColor: palette.forest, backgroundColor: palette.forest },
+  languageText: { color: "#FFFFFF" },
 });

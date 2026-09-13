@@ -1,406 +1,283 @@
 export const languages = ["de", "en", "am", "ti"] as const;
-
 export type Language = (typeof languages)[number];
 
 export type Translation = {
   languageName: string;
   languageCode: string;
-  languageChooserTitle: string;
-  languageChooserHint: string;
-  languageSaveErrorTitle: string;
-  languageSaveErrorMessage: string;
+  chooseLanguage: string;
+  languageHint: string;
   close: string;
   brandSubtitle: string;
-  offlineReady: string;
-  entities: {
-    washedArabica: string;
-    naturalArabica: string;
-    plot: string;
-    batch: string;
+  tabs: { home: string; suppliers: string; plots: string; operations: string; help: string };
+  common: {
+    save: string;
+    create: string;
+    refresh: string;
+    retry: string;
+    download: string;
+    share: string;
+    status: string;
+    name: string;
+    region: string;
+    subjectId: string;
+    pending: string;
+    synced: string;
+    failed: string;
+    conflict: string;
   };
-  tabs: {
-    home: string;
-    suppliers: string;
-    capture: string;
-    shipments: string;
-    help: string;
+  sync: {
+    online: string;
+    offline: string;
+    syncing: string;
+    queued: string;
+    lastSync: string;
+    never: string;
+    syncNow: string;
+    configured: string;
+    notConfigured: string;
+    notConfiguredDetail: string;
+    success: string;
+    error: string;
+    conflicts: string;
+    keepLocal: string;
+    useServer: string;
   };
-  dashboard: {
-    activeShipment: string;
-    complete: string;
-    plots: string;
-    suppliersReady: string;
-    localDrafts: string;
-    today: string;
-    nextSteps: string;
-    open: string;
-    recapturePolygon: string;
-    legalityEvidence: string;
-    reviewCooperative: string;
-    clarifyDifference: string;
-    capturePlot: string;
-  };
+  home: { title: string; intro: string; suppliers: string; plots: string; documents: string };
   suppliers: {
-    eyebrow: string;
     title: string;
     description: string;
-    producers: string;
-    plots: string;
-    statuses: {
-      complete: string;
-      correction: string;
-      invited: string;
-    };
+    add: string;
+    empty: string;
+    producerCount: string;
+    plotCount: string;
   };
-  capture: {
-    eyebrow: string;
+  plots: {
     title: string;
     description: string;
     producer: string;
-    producerPlaceholder: string;
-    farmName: string;
-    farmPlaceholder: string;
+    farm: string;
     area: string;
-    areaPlaceholder: string;
-    gpsCaptured: string;
-    gpsMissing: string;
-    gpsInstruction: string;
-    locating: string;
-    captureGps: string;
+    supplierId: string;
+    capturePoint: string;
+    pointCount: string;
+    polygonJson: string;
+    importGeoJson: string;
+    applyGeoJson: string;
     saveDraft: string;
-    localData: string;
-    savedDrafts: string;
-    noDrafts: string;
-    localOnly: string;
-    alerts: {
-      permissionTitle: string;
-      permissionMessage: string;
-      unavailableTitle: string;
-      unavailableMessage: string;
-      incompleteTitle: string;
-      incompleteMessage: string;
-      invalidAreaTitle: string;
-      invalidAreaMessage: string;
-      savedTitle: string;
-      savedMessage: string;
-      readErrorTitle: string;
-      readErrorMessage: string;
-      saveErrorTitle: string;
-      saveErrorMessage: string;
-    };
+    empty: string;
+    invalidPolygon: string;
+    gpsError: string;
+    permissionError: string;
   };
-  shipments: {
-    eyebrow: string;
+  operations: {
     title: string;
-    description: string;
-    origin: string;
-    quantity: string;
-    readiness: string;
-    ethiopia: string;
-    statuses: {
-      reviewing: string;
-      ready: string;
-    };
+    documents: string;
+    pickUpload: string;
+    satellite: string;
+    requestSatellite: string;
+    evidence: string;
+    requestEvidence: string;
+    dds: string;
+    createDds: string;
+    validateDds: string;
+    submitDds: string;
+    checkStatus: string;
+    noItems: string;
+    providerBlocked: string;
   };
-  help: {
-    eyebrow: string;
-    title: string;
-    guideTitle: string;
-    intro: string;
-    steps: readonly string[];
-    privacyTitle: string;
-    privacy: string;
-    prototype: string;
-  };
-  accessibility: {
-    chooseLanguage: string;
-    currentLanguage: string;
-    dismissLanguageChooser: string;
-    supplierCard: string;
-    shipmentCard: string;
-  };
+  help: { title: string; body: string };
+  alerts: { required: string; saved: string; storageError: string };
 };
 
 export const translations = {
   de: {
-    languageName: "Deutsch",
-    languageCode: "DE",
-    languageChooserTitle: "Sprache auswählen",
-    languageChooserHint: "Die gewählte Sprache wird auf diesem Gerät gespeichert.",
-    languageSaveErrorTitle: "Sprache nicht gespeichert",
-    languageSaveErrorMessage: "Die Sprachauswahl konnte auf diesem Gerät nicht gespeichert werden.",
-    close: "Schließen",
+    languageName: "Deutsch", languageCode: "DE", chooseLanguage: "Sprache auswählen",
+    languageHint: "Die Auswahl wird auf diesem Gerät gespeichert.", close: "Schließen",
     brandSubtitle: "Kaffee-Nachweise",
-    offlineReady: "Offline bereit",
-    entities: {
-      washedArabica: "Gewaschener Arabica",
-      naturalArabica: "Natürlich aufbereiteter Arabica",
-      plot: "Plot",
-      batch: "Charge",
+    tabs: { home: "Start", suppliers: "Partner", plots: "Plots", operations: "Vorgänge", help: "Hilfe" },
+    common: {
+      save: "Speichern", create: "Erstellen", refresh: "Aktualisieren", retry: "Erneut versuchen",
+      download: "Herunterladen", share: "Teilen", status: "Status", name: "Name", region: "Region",
+      subjectId: "Referenz-ID", pending: "Ausstehend", synced: "Synchronisiert", failed: "Fehlgeschlagen",
+      conflict: "Konflikt",
     },
-    tabs: { home: "Start", suppliers: "Partner", capture: "Kaffee-Plot erfassen", shipments: "Sendungen", help: "Hilfe" },
-    dashboard: {
-      activeShipment: "AKTIVE KAFFEE-SENDUNG", complete: "vollständig", plots: "Plots",
-      suppliersReady: "Lieferanten bereit", localDrafts: "Lokale Entwürfe", today: "HEUTE",
-      nextSteps: "Nächste Schritte", open: "3 offen", recapturePolygon: "Polygon vor Ort erneut erfassen",
-      legalityEvidence: "Legalitätsnachweis", reviewCooperative: "Kaffa Cooperative prüfen",
-      clarifyDifference: "120 kg Differenz klären", capturePlot: "Neuen Kaffee-Plot erfassen",
+    sync: {
+      online: "Online", offline: "Offline", syncing: "Synchronisierung ...", queued: "in Warteschlange",
+      lastSync: "Letzte Synchronisierung", never: "Noch nie", syncNow: "Jetzt synchronisieren",
+      configured: "Backend konfiguriert", notConfigured: "Backend nicht konfiguriert",
+      notConfiguredDetail: "EXPO_PUBLIC_API_URL fehlt. Synchronisierung und Provider-Vorgänge sind blockiert.",
+      success: "Synchronisierung abgeschlossen", error: "Synchronisierung fehlgeschlagen",
+      conflicts: "Synchronisierungskonflikte", keepLocal: "Lokale Version behalten", useServer: "Serverversion verwenden",
+    },
+    home: {
+      title: "Feldübersicht", intro: "Offline erfassen, sicher synchronisieren und Compliance-Vorgänge verfolgen.",
+      suppliers: "Lieferanten", plots: "Kaffee-Plots", documents: "Dokumente",
     },
     suppliers: {
-      eyebrow: "LIEFERANTENAUFNAHME", title: "Kaffee-Lieferanten",
-      description: "Kooperativen, Exporteure und Produzenten im aktuellen Pilot.",
-      producers: "Produzenten", plots: "Kaffee-Plots",
-      statuses: { complete: "Vollständig", correction: "Korrektur", invited: "Eingeladen" },
+      title: "Lieferanten", description: "Lieferanten werden offline angelegt und über die Outbox synchronisiert.",
+      add: "Lieferant hinzufügen", empty: "Noch keine Lieferanten.", producerCount: "Produzenten", plotCount: "Plots",
     },
-    capture: {
-      eyebrow: "OFFLINE-KARTIERUNG", title: "Kaffee-Plot erfassen",
-      description: "GPS vor Ort aufnehmen und als lokalen Entwurf speichern.",
-      producer: "Produzent", producerPlaceholder: "z. B. Abebe Bekele",
-      farmName: "Plot- oder Farmname", farmPlaceholder: "z. B. Keta Plot 04",
-      area: "Fläche in Hektar", areaPlaceholder: "2,50", gpsCaptured: "GPS-Position erfasst",
-      gpsMissing: "GPS-Position fehlt", gpsInstruction: "Position direkt am Kaffee-Plot aufnehmen",
-      locating: "Position wird ermittelt ...", captureGps: "GPS erfassen", saveDraft: "Offline-Entwurf speichern",
-      localData: "LOKALE DATEN", savedDrafts: "Gespeicherte Entwürfe",
-      noDrafts: "Noch keine Plot-Entwürfe auf diesem Gerät.", localOnly: "nur lokal",
-      alerts: {
-        permissionTitle: "Standort nicht freigegeben", permissionMessage: "Die GPS-Berechtigung wird benötigt, um den Kaffee-Plot vor Ort zu erfassen.",
-        unavailableTitle: "GPS nicht verfügbar", unavailableMessage: "Der aktuelle Standort konnte nicht gelesen werden. Bitte versuchen Sie es im Freien erneut.",
-        incompleteTitle: "Angaben unvollständig", incompleteMessage: "Produzent, Plotname, Fläche und GPS-Position sind erforderlich.",
-        invalidAreaTitle: "Fläche ungültig", invalidAreaMessage: "Bitte geben Sie eine positive Fläche in Hektar an.",
-        savedTitle: "Offline gespeichert", savedMessage: "Der Plot-Entwurf bleibt auf diesem Gerät, bis eine sichere Backend-Synchronisation konfiguriert ist.",
-        readErrorTitle: "Lokale Daten nicht verfügbar", readErrorMessage: "Gespeicherte Plot-Entwürfe konnten nicht gelesen werden.",
-        saveErrorTitle: "Speichern fehlgeschlagen", saveErrorMessage: "Der Plot-Entwurf konnte nicht sicher auf diesem Gerät gespeichert werden.",
-      },
+    plots: {
+      title: "GeoJSON-Plots", description: "Mindestens drei GPS-Punkte erfassen oder ein GeoJSON-Polygon importieren und bearbeiten.",
+      producer: "Produzent", farm: "Plot- oder Farmname", area: "Fläche (ha)", supplierId: "Lieferanten-ID (optional)",
+      capturePoint: "GPS-Punkt hinzufügen", pointCount: "Punkte", polygonJson: "GeoJSON Polygon",
+      importGeoJson: "GeoJSON importieren", applyGeoJson: "GeoJSON übernehmen", saveDraft: "Offline-Plot speichern",
+      empty: "Noch keine Plot-Entwürfe.", invalidPolygon: "Das Polygon ist ungültig. Mindestens drei unterschiedliche Positionen sind erforderlich.",
+      gpsError: "Der Standort konnte nicht ermittelt werden.", permissionError: "Standortberechtigung wurde nicht erteilt.",
     },
-    shipments: {
-      eyebrow: "LIEFERKETTE", title: "Kaffee-Sendungen",
-      description: "Mengenbilanz und Bereitschaft für den Compliance-Review.",
-      origin: "Herkunft", quantity: "Menge", readiness: "DDS-Bereitschaft", ethiopia: "Äthiopien",
-      statuses: { reviewing: "In Prüfung", ready: "Bereit" },
+    operations: {
+      title: "Compliance-Vorgänge", documents: "Dokumente", pickUpload: "Dokument auswählen und hochladen",
+      satellite: "Satellitenanalyse", requestSatellite: "Analyse anfordern", evidence: "Evidence Pack",
+      requestEvidence: "Evidence Pack anfordern", dds: "DDS-Entwurf", createDds: "DDS-Entwurf erstellen",
+      validateDds: "Validieren", submitDds: "Einreichen", checkStatus: "Status abrufen",
+      noItems: "Noch keine Vorgänge.", providerBlocked: "Provider-Konfiguration fehlt. Dieser Vorgang ist blockiert.",
     },
     help: {
-      eyebrow: "FELDANLEITUNG", title: "Kaffee-Feldarbeit", guideTitle: "Kurzanleitung",
-      intro: "Die mobile App ist für Lieferanten, Kooperativen und Feldteams gedacht.",
-      steps: ["Lieferanten- und Produzentendaten prüfen.", "GPS am Plot erfassen und Fläche dokumentieren.", "Entwurf offline speichern.", "Vor der Synchronisation Angaben und Einwilligung kontrollieren."],
-      privacyTitle: "Datenschutz",
-      privacy: "Standort- und Personendaten nur mit Berechtigung erfassen. Keine Zugangsdaten in Notizen speichern.",
-      prototype: "Prototyp · nur Kaffee · keine Live-EU-Einreichung",
+      title: "Offline und Datenschutz",
+      body: "GPS- und Personendaten nur mit Einwilligung erfassen. Lokale Änderungen bleiben bis zur bestätigten Synchronisierung erhalten. Konflikte werden nie automatisch überschrieben.",
     },
-    accessibility: {
-      chooseLanguage: "Sprache auswählen", currentLanguage: "Aktuelle Sprache: Deutsch",
-      dismissLanguageChooser: "Sprachauswahl schließen", supplierCard: "Lieferant",
-      shipmentCard: "Sendung",
-    },
+    alerts: { required: "Bitte alle erforderlichen Felder ausfüllen.", saved: "Offline gespeichert.", storageError: "Lokale Daten konnten nicht sicher gespeichert werden." },
   },
   en: {
-    languageName: "English",
-    languageCode: "EN",
-    languageChooserTitle: "Choose language",
-    languageChooserHint: "The selected language is saved on this device.",
-    languageSaveErrorTitle: "Language not saved",
-    languageSaveErrorMessage: "The language choice could not be saved on this device.",
-    close: "Close",
+    languageName: "English", languageCode: "EN", chooseLanguage: "Choose language",
+    languageHint: "The selection is saved on this device.", close: "Close",
     brandSubtitle: "Coffee Evidence",
-    offlineReady: "Offline ready",
-    entities: {
-      washedArabica: "Washed Arabica",
-      naturalArabica: "Natural Arabica",
-      plot: "Plot",
-      batch: "Batch",
+    tabs: { home: "Home", suppliers: "Partners", plots: "Plots", operations: "Operations", help: "Help" },
+    common: {
+      save: "Save", create: "Create", refresh: "Refresh", retry: "Retry", download: "Download",
+      share: "Share", status: "Status", name: "Name", region: "Region", subjectId: "Reference ID",
+      pending: "Pending", synced: "Synced", failed: "Failed", conflict: "Conflict",
     },
-    tabs: { home: "Home", suppliers: "Partners", capture: "Capture coffee plot", shipments: "Shipments", help: "Help" },
-    dashboard: {
-      activeShipment: "ACTIVE COFFEE SHIPMENT", complete: "complete", plots: "plots",
-      suppliersReady: "Suppliers ready", localDrafts: "Local drafts", today: "TODAY",
-      nextSteps: "Next steps", open: "3 open", recapturePolygon: "Recapture polygon on site",
-      legalityEvidence: "Legality evidence", reviewCooperative: "Review Kaffa Cooperative",
-      clarifyDifference: "Clarify 120 kg difference", capturePlot: "Capture new coffee plot",
+    sync: {
+      online: "Online", offline: "Offline", syncing: "Synchronising ...", queued: "queued",
+      lastSync: "Last sync", never: "Never", syncNow: "Sync now", configured: "Backend configured",
+      notConfigured: "Backend not configured",
+      notConfiguredDetail: "EXPO_PUBLIC_API_URL is missing. Synchronisation and provider operations are blocked.",
+      success: "Synchronisation completed", error: "Synchronisation failed", conflicts: "Sync conflicts",
+      keepLocal: "Keep local version", useServer: "Use server version",
+    },
+    home: {
+      title: "Field overview", intro: "Capture offline, synchronise safely, and track compliance operations.",
+      suppliers: "Suppliers", plots: "Coffee plots", documents: "Documents",
     },
     suppliers: {
-      eyebrow: "SUPPLIER INTAKE", title: "Coffee suppliers",
-      description: "Cooperatives, exporters, and producers in the current pilot.",
-      producers: "Producers", plots: "Coffee plots",
-      statuses: { complete: "Complete", correction: "Correction", invited: "Invited" },
+      title: "Suppliers", description: "Suppliers are created offline and synchronised through the outbox.",
+      add: "Add supplier", empty: "No suppliers yet.", producerCount: "Producers", plotCount: "Plots",
     },
-    capture: {
-      eyebrow: "OFFLINE MAPPING", title: "Capture coffee plot",
-      description: "Capture GPS on site and save it as a local draft.",
-      producer: "Producer", producerPlaceholder: "e.g. Abebe Bekele",
-      farmName: "Plot or farm name", farmPlaceholder: "e.g. Keta Plot 04",
-      area: "Area in hectares", areaPlaceholder: "2.50", gpsCaptured: "GPS position captured",
-      gpsMissing: "GPS position missing", gpsInstruction: "Capture the position directly at the coffee plot",
-      locating: "Locating ...", captureGps: "Capture GPS", saveDraft: "Save offline draft",
-      localData: "LOCAL DATA", savedDrafts: "Saved drafts",
-      noDrafts: "No plot drafts on this device yet.", localOnly: "local only",
-      alerts: {
-        permissionTitle: "Location not permitted", permissionMessage: "GPS permission is required to capture the coffee plot on site.",
-        unavailableTitle: "GPS unavailable", unavailableMessage: "The current location could not be read. Please try again outdoors.",
-        incompleteTitle: "Incomplete information", incompleteMessage: "Producer, plot name, area, and GPS position are required.",
-        invalidAreaTitle: "Invalid area", invalidAreaMessage: "Please enter a positive area in hectares.",
-        savedTitle: "Saved offline", savedMessage: "The plot draft stays on this device until secure backend synchronisation is configured.",
-        readErrorTitle: "Local data unavailable", readErrorMessage: "Saved plot drafts could not be read.",
-        saveErrorTitle: "Save failed", saveErrorMessage: "The plot draft could not be stored securely on this device.",
-      },
+    plots: {
+      title: "GeoJSON plots", description: "Capture at least three GPS points or import and edit a GeoJSON Polygon.",
+      producer: "Producer", farm: "Plot or farm name", area: "Area (ha)", supplierId: "Supplier ID (optional)",
+      capturePoint: "Add GPS point", pointCount: "Points", polygonJson: "GeoJSON Polygon",
+      importGeoJson: "Import GeoJSON", applyGeoJson: "Apply GeoJSON", saveDraft: "Save offline plot",
+      empty: "No plot drafts yet.", invalidPolygon: "The polygon is invalid. At least three distinct positions are required.",
+      gpsError: "The current location could not be determined.", permissionError: "Location permission was not granted.",
     },
-    shipments: {
-      eyebrow: "CHAIN OF CUSTODY", title: "Coffee shipments",
-      description: "Quantity balance and readiness for compliance review.",
-      origin: "Origin", quantity: "Quantity", readiness: "DDS readiness", ethiopia: "Ethiopia",
-      statuses: { reviewing: "Under review", ready: "Ready" },
+    operations: {
+      title: "Compliance operations", documents: "Documents", pickUpload: "Pick and upload document",
+      satellite: "Satellite analysis", requestSatellite: "Request analysis", evidence: "Evidence pack",
+      requestEvidence: "Request evidence pack", dds: "DDS draft", createDds: "Create DDS draft",
+      validateDds: "Validate", submitDds: "Submit", checkStatus: "Check status", noItems: "No operations yet.",
+      providerBlocked: "Provider configuration is missing. This operation is blocked.",
     },
     help: {
-      eyebrow: "FIELD GUIDE", title: "Coffee field work", guideTitle: "Quick guide",
-      intro: "The mobile app is designed for suppliers, cooperatives, and field teams.",
-      steps: ["Review supplier and producer data.", "Capture GPS at the plot and document the area.", "Save the draft offline.", "Review the data and consent before synchronisation."],
-      privacyTitle: "Privacy",
-      privacy: "Capture location and personal data only with permission. Never store credentials in notes.",
-      prototype: "Prototype · coffee only · no live EU submission",
+      title: "Offline and privacy",
+      body: "Capture GPS and personal data only with consent. Local changes remain until sync is confirmed. Conflicts are never overwritten automatically.",
     },
-    accessibility: {
-      chooseLanguage: "Choose language", currentLanguage: "Current language: English",
-      dismissLanguageChooser: "Close language chooser", supplierCard: "Supplier",
-      shipmentCard: "Shipment",
-    },
+    alerts: { required: "Complete all required fields.", saved: "Saved offline.", storageError: "Local data could not be stored safely." },
   },
   am: {
-    languageName: "አማርኛ",
-    languageCode: "አማ",
-    languageChooserTitle: "ቋንቋ ይምረጡ",
-    languageChooserHint: "የተመረጠው ቋንቋ በዚህ መሣሪያ ላይ ይቀመጣል።",
-    languageSaveErrorTitle: "ቋንቋው አልተቀመጠም",
-    languageSaveErrorMessage: "የቋንቋ ምርጫውን በዚህ መሣሪያ ላይ ማስቀመጥ አልተቻለም።",
-    close: "ዝጋ",
-    brandSubtitle: "የቡና ማስረጃ",
-    offlineReady: "ከመስመር ውጭ ዝግጁ",
-    entities: {
-      washedArabica: "የታጠበ አረቢካ",
-      naturalArabica: "በተፈጥሮ የተዘጋጀ አረቢካ",
-      plot: "መሬት",
-      batch: "ስብስብ",
+    languageName: "አማርኛ", languageCode: "አማ", chooseLanguage: "ቋንቋ ይምረጡ",
+    languageHint: "ምርጫው በዚህ መሣሪያ ላይ ይቀመጣል።", close: "ዝጋ", brandSubtitle: "የቡና ማስረጃ",
+    tabs: { home: "መነሻ", suppliers: "አጋሮች", plots: "መሬቶች", operations: "ሂደቶች", help: "እገዛ" },
+    common: {
+      save: "አስቀምጥ", create: "ፍጠር", refresh: "አድስ", retry: "እንደገና ሞክር", download: "አውርድ",
+      share: "አጋራ", status: "ሁኔታ", name: "ስም", region: "ክልል", subjectId: "የማጣቀሻ መለያ",
+      pending: "በመጠባበቅ ላይ", synced: "ተመሳስሏል", failed: "አልተሳካም", conflict: "ግጭት",
     },
-    tabs: { home: "መነሻ", suppliers: "አጋሮች", capture: "የቡና መሬት ይመዝግቡ", shipments: "ጭነቶች", help: "እገዛ" },
-    dashboard: {
-      activeShipment: "ንቁ የቡና ጭነት", complete: "ተጠናቋል", plots: "መሬቶች",
-      suppliersReady: "ዝግጁ አቅራቢዎች", localDrafts: "የአካባቢ ረቂቆች", today: "ዛሬ",
-      nextSteps: "ቀጣይ እርምጃዎች", open: "3 ክፍት", recapturePolygon: "ፖሊጎኑን በቦታው እንደገና ይመዝግቡ",
-      legalityEvidence: "የሕጋዊነት ማስረጃ", reviewCooperative: "Kaffa Cooperativeን ይፈትሹ",
-      clarifyDifference: "የ120 kg ልዩነትን ያጣሩ", capturePlot: "አዲስ የቡና መሬት ይመዝግቡ",
+    sync: {
+      online: "መስመር ላይ", offline: "ከመስመር ውጭ", syncing: "በማመሳሰል ላይ ...", queued: "ተሰልፏል",
+      lastSync: "የመጨረሻ ማመሳሰል", never: "አልተደረገም", syncNow: "አሁን አመሳስል",
+      configured: "የጀርባ ስርዓት ተዋቅሯል", notConfigured: "የጀርባ ስርዓት አልተዋቀረም",
+      notConfiguredDetail: "EXPO_PUBLIC_API_URL የለም። ማመሳሰልና የአቅራቢ ሂደቶች ታግደዋል።",
+      success: "ማመሳሰል ተጠናቋል", error: "ማመሳሰል አልተሳካም", conflicts: "የማመሳሰል ግጭቶች",
+      keepLocal: "የአካባቢውን ስሪት አቆይ", useServer: "የሰርቨር ስሪት ተጠቀም",
+    },
+    home: {
+      title: "የመስክ አጠቃላይ እይታ", intro: "ከመስመር ውጭ መዝግብ፣ በደህንነት አመሳስል እና የተገዢነት ሂደቶችን ተከታተል።",
+      suppliers: "አቅራቢዎች", plots: "የቡና መሬቶች", documents: "ሰነዶች",
     },
     suppliers: {
-      eyebrow: "የአቅራቢ ምዝገባ", title: "የቡና አቅራቢዎች",
-      description: "በአሁኑ የሙከራ ፕሮግራም ውስጥ ያሉ ማህበራት፣ ላኪዎች እና አምራቾች።",
-      producers: "አምራቾች", plots: "የቡና መሬቶች",
-      statuses: { complete: "ተጠናቋል", correction: "ማስተካከያ", invited: "ተጋብዟል" },
+      title: "አቅራቢዎች", description: "አቅራቢዎች ከመስመር ውጭ ይፈጠራሉ እና በመላኪያ ወረፋ ይመሳሰላሉ።",
+      add: "አቅራቢ ጨምር", empty: "ገና አቅራቢ የለም።", producerCount: "አምራቾች", plotCount: "መሬቶች",
     },
-    capture: {
-      eyebrow: "ከመስመር ውጭ ካርታ", title: "የቡና መሬት ይመዝግቡ",
-      description: "GPSን በቦታው ይመዝግቡ እና እንደ አካባቢ ረቂቅ ያስቀምጡ።",
-      producer: "አምራች", producerPlaceholder: "ለምሳሌ Abebe Bekele",
-      farmName: "የመሬት ወይም የእርሻ ስም", farmPlaceholder: "ለምሳሌ Keta Plot 04",
-      area: "ስፋት በሄክታር", areaPlaceholder: "2.50", gpsCaptured: "የGPS ቦታ ተመዝግቧል",
-      gpsMissing: "የGPS ቦታ አልተመዘገበም", gpsInstruction: "ቦታውን በቡና መሬቱ ላይ ይመዝግቡ",
-      locating: "ቦታ በመፈለግ ላይ ...", captureGps: "GPS ይመዝግቡ", saveDraft: "ረቂቁን ከመስመር ውጭ ያስቀምጡ",
-      localData: "የአካባቢ ውሂብ", savedDrafts: "የተቀመጡ ረቂቆች",
-      noDrafts: "በዚህ መሣሪያ ላይ ገና የመሬት ረቂቅ የለም።", localOnly: "በመሣሪያው ላይ ብቻ",
-      alerts: {
-        permissionTitle: "የቦታ ፈቃድ አልተሰጠም", permissionMessage: "የቡና መሬቱን በቦታው ለመመዝገብ የGPS ፈቃድ ያስፈልጋል።",
-        unavailableTitle: "GPS አይገኝም", unavailableMessage: "የአሁኑን ቦታ ማንበብ አልተቻለም። ከቤት ውጭ እንደገና ይሞክሩ።",
-        incompleteTitle: "መረጃው አልተሟላም", incompleteMessage: "አምራች፣ የመሬት ስም፣ ስፋት እና የGPS ቦታ ያስፈልጋሉ።",
-        invalidAreaTitle: "ስፋቱ ትክክል አይደለም", invalidAreaMessage: "እባክዎ ከዜሮ በላይ የሆነ ስፋት በሄክታር ያስገቡ።",
-        savedTitle: "ከመስመር ውጭ ተቀምጧል", savedMessage: "አስተማማኝ የጀርባ ስርዓት ማመሳሰል እስኪዋቀር ድረስ ረቂቁ በዚህ መሣሪያ ላይ ይቆያል።",
-        readErrorTitle: "የአካባቢ ውሂብ አይገኝም", readErrorMessage: "የተቀመጡ የመሬት ረቂቆችን ማንበብ አልተቻለም።",
-        saveErrorTitle: "ማስቀመጥ አልተሳካም", saveErrorMessage: "የመሬት ረቂቁን በዚህ መሣሪያ ላይ በአስተማማኝ ሁኔታ ማስቀመጥ አልተቻለም።",
-      },
+    plots: {
+      title: "GeoJSON መሬቶች", description: "ቢያንስ ሶስት GPS ነጥቦችን መዝግብ ወይም GeoJSON Polygon አስገባና አርትዕ።",
+      producer: "አምራች", farm: "የመሬት ወይም የእርሻ ስም", area: "ስፋት (ሄክታር)",
+      supplierId: "የአቅራቢ መለያ (አማራጭ)", capturePoint: "GPS ነጥብ ጨምር", pointCount: "ነጥቦች",
+      polygonJson: "GeoJSON Polygon", importGeoJson: "GeoJSON አስገባ", applyGeoJson: "GeoJSON ተግብር",
+      saveDraft: "መሬቱን ከመስመር ውጭ አስቀምጥ", empty: "ገና የመሬት ረቂቅ የለም።",
+      invalidPolygon: "ፖሊጎኑ ትክክል አይደለም። ቢያንስ ሶስት የተለያዩ ቦታዎች ያስፈልጋሉ።",
+      gpsError: "የአሁኑን ቦታ ማወቅ አልተቻለም።", permissionError: "የቦታ ፈቃድ አልተሰጠም።",
     },
-    shipments: {
-      eyebrow: "የአቅርቦት ሰንሰለት", title: "የቡና ጭነቶች",
-      description: "የመጠን ሚዛን እና ለተገዢነት ግምገማ ዝግጁነት።",
-      origin: "መነሻ", quantity: "መጠን", readiness: "የDDS ዝግጁነት", ethiopia: "ኢትዮጵያ",
-      statuses: { reviewing: "በግምገማ ላይ", ready: "ዝግጁ" },
+    operations: {
+      title: "የተገዢነት ሂደቶች", documents: "ሰነዶች", pickUpload: "ሰነድ ምረጥና ስቀል",
+      satellite: "የሳተላይት ትንተና", requestSatellite: "ትንተና ጠይቅ", evidence: "የማስረጃ ጥቅል",
+      requestEvidence: "የማስረጃ ጥቅል ጠይቅ", dds: "የDDS ረቂቅ", createDds: "የDDS ረቂቅ ፍጠር",
+      validateDds: "አረጋግጥ", submitDds: "አስገባ", checkStatus: "ሁኔታን አረጋግጥ",
+      noItems: "ገና ሂደት የለም።", providerBlocked: "የአቅራቢ ውቅር የለም። ይህ ሂደት ታግዷል።",
     },
     help: {
-      eyebrow: "የመስክ መመሪያ", title: "የቡና የመስክ ሥራ", guideTitle: "አጭር መመሪያ",
-      intro: "የሞባይል መተግበሪያው ለአቅራቢዎች፣ ለማህበራት እና ለመስክ ቡድኖች የተዘጋጀ ነው።",
-      steps: ["የአቅራቢና የአምራች መረጃን ያረጋግጡ።", "በመሬቱ ላይ GPS ይመዝግቡ እና ስፋቱን ያስገቡ።", "ረቂቁን ያለ ኢንተርኔት ያስቀምጡ።", "ከማስተላለፍ በፊት መረጃውንና ፈቃዱን ያረጋግጡ።"],
-      privacyTitle: "ግላዊነት",
-      privacy: "የአካባቢና የግል መረጃን በፈቃድ ብቻ ይመዝግቡ። የመግቢያ ቁልፎችን በማስታወሻ ውስጥ አያስቀምጡ።",
-      prototype: "ሙከራ · ቡና ብቻ · ቀጥታ የEU ማስገባት የለም",
+      title: "ከመስመር ውጭ እና ግላዊነት",
+      body: "GPS እና የግል መረጃን በፈቃድ ብቻ ይመዝግቡ። የአካባቢ ለውጦች ማመሳሰል እስኪረጋገጥ ይቆያሉ። ግጭቶች በራስ-ሰር አይተኩም።",
     },
-    accessibility: {
-      chooseLanguage: "ቋንቋ ይምረጡ", currentLanguage: "የአሁኑ ቋንቋ፦ አማርኛ",
-      dismissLanguageChooser: "የቋንቋ መምረጫውን ዝጋ", supplierCard: "አቅራቢ",
-      shipmentCard: "ጭነት",
-    },
+    alerts: { required: "እባክዎ ሁሉንም አስፈላጊ መስኮች ይሙሉ።", saved: "ከመስመር ውጭ ተቀምጧል።", storageError: "የአካባቢ ውሂብ በደህንነት ሊቀመጥ አልቻለም።" },
   },
   ti: {
-    languageName: "ትግርኛ",
-    languageCode: "ትግ",
-    languageChooserTitle: "ቋንቋ ምረጹ",
-    languageChooserHint: "እቲ ዝተመርጸ ቋንቋ ኣብዚ መሳርሒ ይዕቀብ።",
-    languageSaveErrorTitle: "ቋንቋ ኣይተዓቀበን",
-    languageSaveErrorMessage: "ምርጫ ቋንቋ ኣብዚ መሳርሒ ክዕቀብ ኣይከኣለን።",
-    close: "ዕጸው",
-    brandSubtitle: "መርትዖ ቡን",
-    offlineReady: "ካብ መስመር ወጻኢ ድሉው",
-    entities: {
-      washedArabica: "ዝተሓጽበ ኣረቢካ",
-      naturalArabica: "ብተፈጥሮ ዝተዳለወ ኣረቢካ",
-      plot: "ግራት",
-      batch: "ጉጅለ",
+    languageName: "ትግርኛ", languageCode: "ትግ", chooseLanguage: "ቋንቋ ምረጹ",
+    languageHint: "እቲ ምርጫ ኣብዚ መሳርሒ ይዕቀብ።", close: "ዕጸው", brandSubtitle: "መርትዖ ቡን",
+    tabs: { home: "መበገሲ", suppliers: "መሻርኽቲ", plots: "ግራውቲ", operations: "መስርሓት", help: "ሓገዝ" },
+    common: {
+      save: "ዓቅብ", create: "ፍጠር", refresh: "ኣሐድስ", retry: "ደጊምካ ፈትን", download: "ኣውርድ",
+      share: "ኣካፍል", status: "ኩነታት", name: "ስም", region: "ክልል", subjectId: "መወከሲ መለለዪ",
+      pending: "ይጽበ ኣሎ", synced: "ተመሳሲሉ", failed: "ኣይተዓወተን", conflict: "ግጭት",
     },
-    tabs: { home: "መበገሲ", suppliers: "መሻርኽቲ", capture: "ግራት ቡን መዝግብ", shipments: "ጽዕነት", help: "ሓገዝ" },
-    dashboard: {
-      activeShipment: "ንጡፍ ጽዕነት ቡን", complete: "ተዛዚሙ", plots: "ግራውቲ",
-      suppliersReady: "ድሉዋት ኣቕረብቲ", localDrafts: "ናይ መሳርሒ ንድፍታት", today: "ሎሚ",
-      nextSteps: "ዝቕጽሉ ስጉምትታት", open: "3 ክፉት", recapturePolygon: "ነቲ ፖሊጎን ኣብ ቦታኡ ደጊምኩም መዝግቡ",
-      legalityEvidence: "መርትዖ ሕጋውነት", reviewCooperative: "Kaffa Cooperative መርምሩ",
-      clarifyDifference: "ፍልልይ 120 kg ኣነጽሩ", capturePlot: "ሓድሽ ግራት ቡን መዝግቡ",
+    sync: {
+      online: "ኣብ መስመር", offline: "ካብ መስመር ወጻኢ", syncing: "ይመሳሰል ኣሎ ...", queued: "ተሰሪዑ",
+      lastSync: "ናይ መወዳእታ ምትእስሳር", never: "ኣይተገብረን", syncNow: "ሕጂ ኣመሳስል",
+      configured: "ስርዓተ-ድሕሪት ተዋቒሩ", notConfigured: "ስርዓተ-ድሕሪት ኣይተዋቐረን",
+      notConfiguredDetail: "EXPO_PUBLIC_API_URL የለን። ምትእስሳርን ናይ ኣቕራቢ መስርሓትን ተዓጽዮም።",
+      success: "ምትእስሳር ተዛዚሙ", error: "ምትእስሳር ኣይተዓወተን", conflicts: "ናይ ምትእስሳር ግጭታት",
+      keepLocal: "ናይ መሳርሒ ስሪት ዓቅብ", useServer: "ናይ ሰርቨር ስሪት ተጠቐም",
+    },
+    home: {
+      title: "ሓፈሻዊ እዋን መስክ", intro: "ካብ መስመር ወጻኢ መዝግቡ፣ ብውሕስነት ኣመሳስሉ፣ መስርሓት ምኽባር ሕጊ ተኸታተሉ።",
+      suppliers: "ኣቕረብቲ", plots: "ግራውቲ ቡን", documents: "ሰነዳት",
     },
     suppliers: {
-      eyebrow: "ምዝገባ ኣቕራቢ", title: "ኣቕረብቲ ቡን",
-      description: "ኣብዚ ናይ ፈተነ መደብ ዘለዉ ማሕበራት፣ ሰደድቲን ኣፍረይትን።",
-      producers: "ኣፍረይቲ", plots: "ግራውቲ ቡን",
-      statuses: { complete: "ተዛዚሙ", correction: "መአረምታ", invited: "ተዓዲሙ" },
+      title: "ኣቕረብቲ", description: "ኣቕረብቲ ካብ መስመር ወጻኢ ይፍጠሩን ብመስርዕ ልኡኽ ይመሳሰሉን።",
+      add: "ኣቕራቢ ወስኽ", empty: "ገና ኣቕራቢ የለን።", producerCount: "ኣፍረይቲ", plotCount: "ግራውቲ",
     },
-    capture: {
-      eyebrow: "ካብ መስመር ወጻኢ ካርታ", title: "ግራት ቡን መዝግቡ",
-      description: "GPS ኣብ ቦታኡ መዝጊብኩም ከም ናይ መሳርሒ ንድፊ ዓቅቡ።",
-      producer: "ኣፍራዪ", producerPlaceholder: "ንኣብነት Abebe Bekele",
-      farmName: "ስም ግራት ወይ ሕርሻ", farmPlaceholder: "ንኣብነት Keta Plot 04",
-      area: "ስፍሓት ብሄክታር", areaPlaceholder: "2.50", gpsCaptured: "ቦታ GPS ተመዝጊቡ",
-      gpsMissing: "ቦታ GPS ኣይተመዝገበን", gpsInstruction: "ቦታኹም ኣብቲ ግራት ቡን መዝግቡ",
-      locating: "ቦታ ይድለ ኣሎ ...", captureGps: "GPS መዝግብ", saveDraft: "ንድፊ ካብ መስመር ወጻኢ ዓቅብ",
-      localData: "ናይ መሳርሒ ዳታ", savedDrafts: "ዝተዓቀቡ ንድፍታት",
-      noDrafts: "ኣብዚ መሳርሒ ገና ንድፊ ግራት የለን።", localOnly: "ኣብ መሳርሒ ጥራይ",
-      alerts: {
-        permissionTitle: "ፍቓድ ቦታ ኣይተዋህበን", permissionMessage: "ነቲ ግራት ቡን ኣብ ቦታኡ ንምምዝጋብ ፍቓድ GPS የድሊ።",
-        unavailableTitle: "GPS ኣይርከብን", unavailableMessage: "እዋናዊ ቦታ ክንበብ ኣይከኣለን። ኣብ ደገ ደጊምኩም ፈትኑ።",
-        incompleteTitle: "ሓበሬታ ኣይተማልአን", incompleteMessage: "ኣፍራዪ፣ ስም ግራት፣ ስፍሓትን ቦታ GPSን የድልዩ።",
-        invalidAreaTitle: "ስፍሓት ቅኑዕ ኣይኮነን", invalidAreaMessage: "በጃኹም ካብ ዜሮ ዝዓቢ ስፍሓት ብሄክታር ኣእትዉ።",
-        savedTitle: "ካብ መስመር ወጻኢ ተዓቂቡ", savedMessage: "ውሑስ ምትእስሳር ስርዓተ-ድሕሪት ክሳብ ዝዳሎ እቲ ንድፊ ኣብዚ መሳርሒ ይጸንሕ።",
-        readErrorTitle: "ናይ መሳርሒ ዳታ ኣይርከብን", readErrorMessage: "ዝተዓቀቡ ንድፍታት ግራት ክንበቡ ኣይከኣሉን።",
-        saveErrorTitle: "ምዕቃብ ኣይተዓወተን", saveErrorMessage: "እቲ ንድፊ ግራት ኣብዚ መሳርሒ ብውሕስነት ክዕቀብ ኣይከኣለን።",
-      },
+    plots: {
+      title: "GeoJSON ግራውቲ", description: "እንተወሓደ ሰለስተ GPS ነጥቢ መዝግቡ ወይ GeoJSON Polygon ኣእትዉን ኣርሙን።",
+      producer: "ኣፍራዪ", farm: "ስም ግራት ወይ ሕርሻ", area: "ስፍሓት (ሄክታር)",
+      supplierId: "መለለዪ ኣቕራቢ (ኣማራጺ)", capturePoint: "ነጥቢ GPS ወስኽ", pointCount: "ነጥብታት",
+      polygonJson: "GeoJSON Polygon", importGeoJson: "GeoJSON ኣእቱ", applyGeoJson: "GeoJSON ተግብር",
+      saveDraft: "ግራት ካብ መስመር ወጻኢ ዓቅብ", empty: "ገና ንድፊ ግራት የለን።",
+      invalidPolygon: "እቲ ፖሊጎን ቅኑዕ ኣይኮነን። እንተወሓደ ሰለስተ ዝተፈላለዩ ቦታታት የድልዩ።",
+      gpsError: "እዋናዊ ቦታ ክፍለጥ ኣይከኣለን።", permissionError: "ፍቓድ ቦታ ኣይተዋህበን።",
     },
-    shipments: {
-      eyebrow: "ሰንሰለት ቀረብ", title: "ጽዕነት ቡን",
-      description: "ሚዛን መጠንን ንግምገማ ምኽባር ሕጊ ድሉውነትን።",
-      origin: "መበቆል", quantity: "መጠን", readiness: "ድሉውነት DDS", ethiopia: "ኢትዮጵያ",
-      statuses: { reviewing: "ኣብ ግምገማ", ready: "ድሉው" },
+    operations: {
+      title: "መስርሓት ምኽባር ሕጊ", documents: "ሰነዳት", pickUpload: "ሰነድ ምረጽን ስቐልን",
+      satellite: "ትንተና ሳተላይት", requestSatellite: "ትንተና ሕተት", evidence: "ጥርናፈ መርትዖ",
+      requestEvidence: "ጥርናፈ መርትዖ ሕተት", dds: "ንድፊ DDS", createDds: "ንድፊ DDS ፍጠር",
+      validateDds: "ኣረጋግጽ", submitDds: "ኣቕርብ", checkStatus: "ኩነታት ርአ",
+      noItems: "ገና መስርሕ የለን።", providerBlocked: "ውቅር ኣቕራቢ የለን። እዚ መስርሕ ተዓጽዩ።",
     },
     help: {
-      eyebrow: "መምርሒ መስክ", title: "ናይ ቡን ስራሕ መስክ", guideTitle: "ሓጺር መምርሒ",
-      intro: "እዚ ሞባይል መተግበሪ ንኣቕረብቲ፣ ማሕበራትን ጉጅለታት መስክን ዝተዳለወ እዩ።",
-      steps: ["ሓበሬታ ኣቕራቢን ኣፍራዪን መርምሩ።", "GPS ኣብቲ ግራት መዝጊብኩም ስፍሓቱ ሰንዱ።", "እቲ ንድፊ ካብ መስመር ወጻኢ ዓቅቡ።", "ቅድሚ ምትእስሳር ሓበሬታን ፍቓድን መርምሩ።"],
-      privacyTitle: "ብሕታውነት",
-      privacy: "ሓበሬታ ቦታን ውልቀ-ሰብን ብፍቓድ ጥራይ መዝግቡ። መረጋገጺ መእተዊ ኣብ መዘኻኸሪ ኣይተዓቅቡ።",
-      prototype: "ፈተነ · ቡን ጥራይ · ቀጥታ ናብ EU ምቕራብ የለን",
+      title: "ካብ መስመር ወጻኢን ብሕታውነትን",
+      body: "GPSን ውልቃዊ ሓበሬታን ብፍቓድ ጥራይ መዝግቡ። ናይ መሳርሒ ለውጥታት ምትእስሳር ክሳብ ዝረጋገጽ ይጸንሑ። ግጭታት ብራስ-ሰር ኣይትክኡን።",
     },
-    accessibility: {
-      chooseLanguage: "ቋንቋ ምረጹ", currentLanguage: "እዋናዊ ቋንቋ፦ ትግርኛ",
-      dismissLanguageChooser: "መምረጺ ቋንቋ ዕጸው", supplierCard: "ኣቕራቢ",
-      shipmentCard: "ጽዕነት",
-    },
+    alerts: { required: "በጃኹም ኩሎም ዘድልዩ ቦታታት ምልኡ።", saved: "ካብ መስመር ወጻኢ ተዓቂቡ።", storageError: "ናይ መሳርሒ ዳታ ብውሕስነት ክዕቀብ ኣይከኣለን።" },
   },
 } satisfies Record<Language, Translation>;
 
