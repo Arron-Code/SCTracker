@@ -9,7 +9,7 @@ Gemeinsame Expo/React-Native-App für Android und iOS. Die App ist auf Kaffee be
 - GPS-Erfassung für Kaffee-Plots
 - lokale Offline-Entwürfe mit AsyncStorage
 - Sendungs- und DDS-Bereitschaft
-- Hilfe in Deutsch, Englisch und Amharisch
+- vollständig lokalisierte Bedienoberfläche und Hilfe in Deutsch, Englisch, Amharisch und Tigrinya
 
 Die aktuelle Version ist ein Prototyp. Lokale Entwürfe werden noch nicht mit einem Backend synchronisiert und es erfolgt keine Übermittlung an das EU Information System.
 
@@ -40,4 +40,4 @@ npx eas-cli build --profile preview --platform android
 npx eas-cli build --profile preview --platform ios
 ```
 
-Für einen iOS-Build und die App-Store-Veröffentlichung wird ein Apple-Developer-Konto benötigt. Für Google Play wird ein Google-Play-Developer-Konto benötigt. Store-Builds sollten erst nach Backend-Anbindung, Security Review, Datenschutzprüfung und muttersprachlicher Prüfung der amharischen Texte erstellt werden.
+Für einen iOS-Build und die App-Store-Veröffentlichung wird ein Apple-Developer-Konto benötigt. Für Google Play wird ein Google-Play-Developer-Konto benötigt. Store-Builds sollten erst nach Backend-Anbindung, Security Review, Datenschutzprüfung und muttersprachlicher Prüfung der amharischen und tigrinischen Texte erstellt werden.

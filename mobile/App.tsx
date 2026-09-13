@@ -2,9 +2,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
+  Modal,
   Platform,
   Pressable,
   SafeAreaView,
@@ -15,9 +17,15 @@ import {
   TextInput,
   View,
 } from "react-native";
+import {
+  isLanguage,
+  languages,
+  translations,
+  type Language,
+  type Translation,
+} from "./src/i18n";
 
 type Tab = "home" | "suppliers" | "capture" | "shipments" | "help";
-type Language = "de" | "en" | "am";
 
 type PlotDraft = {
   id: string;
@@ -31,6 +39,7 @@ type PlotDraft = {
 };
 
 const STORAGE_KEY = "sctracker.plotDrafts.v1";
+const LANGUAGE_STORAGE_KEY = "sctracker.language.v1";
 
 const palette = {
   ink: "#14251D",
@@ -47,51 +56,6 @@ const palette = {
   softAmber: "#F8E8CE",
 };
 
-const copy = {
-  de: {
-    title: "Kaffee-Feldarbeit",
-    guideTitle: "Kurzanleitung",
-    guideIntro:
-      "Die mobile App ist für Lieferanten, Kooperativen und Feldteams gedacht.",
-    steps: [
-      "Lieferanten- und Produzentendaten prüfen.",
-      "GPS am Plot erfassen und Fläche dokumentieren.",
-      "Entwurf offline speichern.",
-      "Vor der Synchronisation Angaben und Einwilligung kontrollieren.",
-    ],
-    privacy:
-      "Standort- und Personendaten nur mit Berechtigung erfassen. Keine Zugangsdaten in Notizen speichern.",
-  },
-  en: {
-    title: "Coffee field work",
-    guideTitle: "Quick guide",
-    guideIntro:
-      "The mobile app is designed for suppliers, cooperatives, and field teams.",
-    steps: [
-      "Review supplier and producer data.",
-      "Capture GPS at the plot and document the area.",
-      "Save the draft offline.",
-      "Review the data and consent before synchronisation.",
-    ],
-    privacy:
-      "Capture location and personal data only with permission. Never store credentials in notes.",
-  },
-  am: {
-    title: "የቡና የመስክ ሥራ",
-    guideTitle: "አጭር መመሪያ",
-    guideIntro:
-      "የሞባይል መተግበሪያው ለአቅራቢዎች፣ ለማህበራት እና ለመስክ ቡድኖች የተዘጋጀ ነው።",
-    steps: [
-      "የአቅራቢና የአምራች መረጃን ያረጋግጡ።",
-      "በመሬቱ ላይ GPS ይመዝግቡ እና ስፋቱን ያስገቡ።",
-      "ረቂቁን ያለ ኢንተርኔት ያስቀምጡ።",
-      "ከማስተላለፍ በፊት መረጃውንና ፈቃዱን ያረጋግጡ።",
-    ],
-    privacy:
-      "የአካባቢና የግል መረጃን በፈቃድ ብቻ ይመዝግቡ። የመግቢያ ቁልፎችን በማስታወሻ ውስጥ አያስቀምጡ።",
-  },
-};
-
 const suppliers = [
   {
     id: "SUP-00018",
@@ -99,7 +63,7 @@ const suppliers = [
     region: "Jimma · Oromia",
     producers: 94,
     plots: 112,
-    status: "Vollständig",
+    status: "complete" as const,
     tone: "success" as const,
   },
   {
@@ -108,7 +72,7 @@ const suppliers = [
     region: "Jimma · Oromia",
     producers: 11,
     plots: 14,
-    status: "Korrektur",
+    status: "correction" as const,
     tone: "warning" as const,
   },
   {
@@ -117,7 +81,7 @@ const suppliers = [
     region: "Sidama",
     producers: 38,
     plots: 47,
-    status: "Eingeladen",
+    status: "invited" as const,
     tone: "neutral" as const,
   },
 ];
@@ -125,19 +89,19 @@ const suppliers = [
 const shipments = [
   {
     id: "IMP-2026-0142",
-    product: "Washed Arabica",
-    origin: "Jimma, Äthiopien",
+    product: "washedArabica" as const,
+    origin: "Jimma",
     quantity: "18.500 kg",
     readiness: 72,
-    status: "In Prüfung",
+    status: "reviewing" as const,
   },
   {
     id: "IMP-2026-0137",
-    product: "Natural Arabica",
-    origin: "Sidama, Äthiopien",
+    product: "naturalArabica" as const,
+    origin: "Sidama",
     quantity: "12.800 kg",
     readiness: 100,
-    status: "Bereit",
+    status: "ready" as const,
   },
 ];
 
@@ -153,7 +117,13 @@ function TabButton({
   onPress: () => void;
 }) {
   return (
-    <Pressable style={styles.tabButton} onPress={onPress}>
+    <Pressable
+      style={styles.tabButton}
+      onPress={onPress}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: active }}
+      accessibilityLabel={label}
+    >
       <Ionicons
         name={active ? icon : (`${icon}-outline` as keyof typeof Ionicons.glyphMap)}
         size={22}
@@ -213,27 +183,29 @@ function SectionTitle({
 function HomeScreen({
   drafts,
   onCapture,
+  t,
 }: {
   drafts: PlotDraft[];
   onCapture: () => void;
+  t: Translation;
 }) {
   return (
     <>
       <View style={styles.hero}>
         <View style={styles.heroCopy}>
-          <Text style={styles.heroEyebrow}>AKTIVE KAFFEE-SENDUNG</Text>
+          <Text style={styles.heroEyebrow}>{t.dashboard.activeShipment}</Text>
           <Text style={styles.heroTitle}>IMP-2026-0142</Text>
           <Text style={styles.heroText}>
-            Washed Arabica · Jimma → Hamburg
+            {t.entities.washedArabica} · Jimma → Hamburg
           </Text>
           <View style={styles.heroTags}>
             <Text style={styles.heroTag}>18.500 kg</Text>
-            <Text style={styles.heroTag}>126 Plots</Text>
+            <Text style={styles.heroTag}>126 {t.dashboard.plots}</Text>
           </View>
         </View>
         <View style={styles.score}>
           <Text style={styles.scoreValue}>78%</Text>
-          <Text style={styles.scoreLabel}>vollständig</Text>
+          <Text style={styles.scoreLabel}>{t.dashboard.complete}</Text>
         </View>
       </View>
 
@@ -241,27 +213,27 @@ function HomeScreen({
         <View style={styles.metricCard}>
           <Ionicons name="people" size={22} color={palette.forest} />
           <Text style={styles.metricValue}>8/10</Text>
-          <Text style={styles.metricLabel}>Lieferanten bereit</Text>
+          <Text style={styles.metricLabel}>{t.dashboard.suppliersReady}</Text>
         </View>
         <View style={styles.metricCard}>
           <Ionicons name="cloud-offline" size={22} color={palette.amber} />
           <Text style={styles.metricValue}>{drafts.length}</Text>
-          <Text style={styles.metricLabel}>Lokale Entwürfe</Text>
+          <Text style={styles.metricLabel}>{t.dashboard.localDrafts}</Text>
         </View>
       </View>
 
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View>
-            <Text style={styles.eyebrow}>HEUTE</Text>
-            <Text style={styles.cardTitle}>Nächste Schritte</Text>
+            <Text style={styles.eyebrow}>{t.dashboard.today}</Text>
+            <Text style={styles.cardTitle}>{t.dashboard.nextSteps}</Text>
           </View>
-          <Badge tone="warning">3 offen</Badge>
+          <Badge tone="warning">{t.dashboard.open}</Badge>
         </View>
         {[
-          ["warning", "Plot ET-JIM-044", "Polygon vor Ort erneut erfassen"],
-          ["document-text", "Legalitätsnachweis", "Kaffa Cooperative prüfen"],
-          ["cube", "Batch B-2026-091", "120 kg Differenz klären"],
+          ["warning", `${t.entities.plot} ET-JIM-044`, t.dashboard.recapturePolygon],
+          ["document-text", t.dashboard.legalityEvidence, t.dashboard.reviewCooperative],
+          ["cube", `${t.entities.batch} B-2026-091`, t.dashboard.clarifyDifference],
         ].map(([icon, title, detail], index) => (
           <View key={title} style={[styles.task, index === 2 && styles.taskLast]}>
             <View style={styles.taskIcon}>
@@ -280,24 +252,34 @@ function HomeScreen({
         ))}
       </View>
 
-      <Pressable style={styles.primaryButton} onPress={onCapture}>
+      <Pressable
+        style={styles.primaryButton}
+        onPress={onCapture}
+        accessibilityRole="button"
+        accessibilityLabel={t.dashboard.capturePlot}
+      >
         <Ionicons name="locate" size={20} color="#FFFFFF" />
-        <Text style={styles.primaryButtonText}>Neuen Kaffee-Plot erfassen</Text>
+        <Text style={styles.primaryButtonText}>{t.dashboard.capturePlot}</Text>
       </Pressable>
     </>
   );
 }
 
-function SuppliersScreen() {
+function SuppliersScreen({ t }: { t: Translation }) {
   return (
     <>
       <SectionTitle
-        eyebrow="SUPPLIER INTAKE"
-        title="Kaffee-Lieferanten"
-        description="Kooperativen, Exporteure und Produzenten im aktuellen Pilot."
+        eyebrow={t.suppliers.eyebrow}
+        title={t.suppliers.title}
+        description={t.suppliers.description}
       />
       {suppliers.map((supplier) => (
-        <View key={supplier.id} style={styles.card}>
+        <View
+          key={supplier.id}
+          style={styles.card}
+          accessible
+          accessibilityLabel={`${t.accessibility.supplierCard} ${supplier.name}, ${t.suppliers.statuses[supplier.status]}`}
+        >
           <View style={styles.cardHeader}>
             <View style={styles.supplierIdentity}>
               <View style={styles.initial}>
@@ -310,17 +292,17 @@ function SuppliersScreen() {
                 </Text>
               </View>
             </View>
-            <Badge tone={supplier.tone}>{supplier.status}</Badge>
+            <Badge tone={supplier.tone}>{t.suppliers.statuses[supplier.status]}</Badge>
           </View>
           <View style={styles.supplierStats}>
             <View>
               <Text style={styles.statValue}>{supplier.producers}</Text>
-              <Text style={styles.caption}>Produzenten</Text>
+              <Text style={styles.caption}>{t.suppliers.producers}</Text>
             </View>
             <View style={styles.statDivider} />
             <View>
               <Text style={styles.statValue}>{supplier.plots}</Text>
-              <Text style={styles.caption}>Kaffee-Plots</Text>
+              <Text style={styles.caption}>{t.suppliers.plots}</Text>
             </View>
           </View>
         </View>
@@ -332,9 +314,11 @@ function SuppliersScreen() {
 function CaptureScreen({
   drafts,
   onDraftSaved,
+  t,
 }: {
   drafts: PlotDraft[];
   onDraftSaved: (draft: PlotDraft) => void;
+  t: Translation;
 }) {
   const [producer, setProducer] = useState("");
   const [farmName, setFarmName] = useState("");
@@ -348,8 +332,8 @@ function CaptureScreen({
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== "granted") {
         Alert.alert(
-          "Standort nicht freigegeben",
-          "Die GPS-Berechtigung wird benötigt, um den Kaffee-Plot vor Ort zu erfassen.",
+          t.capture.alerts.permissionTitle,
+          t.capture.alerts.permissionMessage,
         );
         return;
       }
@@ -360,8 +344,8 @@ function CaptureScreen({
       setLocation(result);
     } catch {
       Alert.alert(
-        "GPS nicht verfügbar",
-        "Der aktuelle Standort konnte nicht gelesen werden. Bitte versuchen Sie es im Freien erneut.",
+        t.capture.alerts.unavailableTitle,
+        t.capture.alerts.unavailableMessage,
       );
     } finally {
       setLocating(false);
@@ -371,15 +355,15 @@ function CaptureScreen({
   function saveDraft() {
     if (!producer.trim() || !farmName.trim() || !areaHa.trim() || !location) {
       Alert.alert(
-        "Angaben unvollständig",
-        "Produzent, Plotname, Fläche und GPS-Position sind erforderlich.",
+        t.capture.alerts.incompleteTitle,
+        t.capture.alerts.incompleteMessage,
       );
       return;
     }
 
     const parsedArea = Number(areaHa.replace(",", "."));
     if (!Number.isFinite(parsedArea) || parsedArea <= 0) {
-      Alert.alert("Fläche ungültig", "Bitte geben Sie eine positive Fläche in Hektar an.");
+      Alert.alert(t.capture.alerts.invalidAreaTitle, t.capture.alerts.invalidAreaMessage);
       return;
     }
 
@@ -399,43 +383,46 @@ function CaptureScreen({
     setAreaHa("");
     setLocation(null);
     Alert.alert(
-      "Offline gespeichert",
-      "Der Plot-Entwurf bleibt auf diesem Gerät, bis eine sichere Backend-Synchronisation konfiguriert ist.",
+      t.capture.alerts.savedTitle,
+      t.capture.alerts.savedMessage,
     );
   }
 
   return (
     <>
       <SectionTitle
-        eyebrow="OFFLINE MAPPING"
-        title="Kaffee-Plot erfassen"
-        description="GPS vor Ort aufnehmen und als lokalen Entwurf speichern."
+        eyebrow={t.capture.eyebrow}
+        title={t.capture.title}
+        description={t.capture.description}
       />
 
       <View style={styles.card}>
-        <Text style={styles.inputLabel}>Produzent</Text>
+        <Text style={styles.inputLabel}>{t.capture.producer}</Text>
         <TextInput
           value={producer}
           onChangeText={setProducer}
-          placeholder="z. B. Abebe Bekele"
+          placeholder={t.capture.producerPlaceholder}
+          accessibilityLabel={t.capture.producer}
           placeholderTextColor="#98A29C"
           style={styles.input}
         />
 
-        <Text style={styles.inputLabel}>Plot- oder Farmname</Text>
+        <Text style={styles.inputLabel}>{t.capture.farmName}</Text>
         <TextInput
           value={farmName}
           onChangeText={setFarmName}
-          placeholder="z. B. Keta Plot 04"
+          placeholder={t.capture.farmPlaceholder}
+          accessibilityLabel={t.capture.farmName}
           placeholderTextColor="#98A29C"
           style={styles.input}
         />
 
-        <Text style={styles.inputLabel}>Fläche in Hektar</Text>
+        <Text style={styles.inputLabel}>{t.capture.area}</Text>
         <TextInput
           value={areaHa}
           onChangeText={setAreaHa}
-          placeholder="2,50"
+          placeholder={t.capture.areaPlaceholder}
+          accessibilityLabel={t.capture.area}
           placeholderTextColor="#98A29C"
           keyboardType="decimal-pad"
           style={styles.input}
@@ -451,12 +438,12 @@ function CaptureScreen({
           </View>
           <View style={styles.flex}>
             <Text style={styles.taskTitle}>
-              {location ? "GPS-Position erfasst" : "GPS-Position fehlt"}
+              {location ? t.capture.gpsCaptured : t.capture.gpsMissing}
             </Text>
             <Text style={styles.taskDetail}>
               {location
                 ? `${location.coords.latitude.toFixed(6)}, ${location.coords.longitude.toFixed(6)}`
-                : "Position direkt am Kaffee-Plot aufnehmen"}
+                : t.capture.gpsInstruction}
             </Text>
           </View>
         </View>
@@ -465,29 +452,37 @@ function CaptureScreen({
           style={styles.secondaryButton}
           onPress={captureLocation}
           disabled={locating}
+          accessibilityRole="button"
+          accessibilityLabel={locating ? t.capture.locating : t.capture.captureGps}
+          accessibilityState={{ disabled: locating }}
         >
           <Ionicons name="locate" size={19} color={palette.forest} />
           <Text style={styles.secondaryButtonText}>
-            {locating ? "Position wird ermittelt ..." : "GPS erfassen"}
+            {locating ? t.capture.locating : t.capture.captureGps}
           </Text>
         </Pressable>
-        <Pressable style={styles.primaryButton} onPress={saveDraft}>
+        <Pressable
+          style={styles.primaryButton}
+          onPress={saveDraft}
+          accessibilityRole="button"
+          accessibilityLabel={t.capture.saveDraft}
+        >
           <Ionicons name="save" size={19} color="#FFFFFF" />
-          <Text style={styles.primaryButtonText}>Offline-Entwurf speichern</Text>
+          <Text style={styles.primaryButtonText}>{t.capture.saveDraft}</Text>
         </Pressable>
       </View>
 
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View>
-            <Text style={styles.eyebrow}>LOKALE DATEN</Text>
-            <Text style={styles.cardTitle}>Gespeicherte Entwürfe</Text>
+            <Text style={styles.eyebrow}>{t.capture.localData}</Text>
+            <Text style={styles.cardTitle}>{t.capture.savedDrafts}</Text>
           </View>
           <Badge>{String(drafts.length)}</Badge>
         </View>
         {drafts.length === 0 ? (
           <Text style={styles.emptyText}>
-            Noch keine Plot-Entwürfe auf diesem Gerät.
+            {t.capture.noDrafts}
           </Text>
         ) : (
           drafts.map((draft, index) => (
@@ -501,7 +496,7 @@ function CaptureScreen({
               <View style={styles.taskCopy}>
                 <Text style={styles.taskTitle}>{draft.farmName}</Text>
                 <Text style={styles.taskDetail}>
-                  {draft.producer} · {draft.areaHa} ha · nur lokal
+                  {draft.producer} · {draft.areaHa} ha · {t.capture.localOnly}
                 </Text>
               </View>
               <Ionicons name="cloud-offline" size={18} color={palette.amber} />
@@ -513,37 +508,42 @@ function CaptureScreen({
   );
 }
 
-function ShipmentsScreen() {
+function ShipmentsScreen({ t }: { t: Translation }) {
   return (
     <>
       <SectionTitle
-        eyebrow="CHAIN OF CUSTODY"
-        title="Kaffee-Sendungen"
-        description="Mengenbilanz und Bereitschaft für den Compliance-Review."
+        eyebrow={t.shipments.eyebrow}
+        title={t.shipments.title}
+        description={t.shipments.description}
       />
       {shipments.map((shipment) => (
-        <View key={shipment.id} style={styles.card}>
+        <View
+          key={shipment.id}
+          style={styles.card}
+          accessible
+          accessibilityLabel={`${t.accessibility.shipmentCard} ${shipment.id}, ${t.shipments.statuses[shipment.status]}`}
+        >
           <View style={styles.cardHeader}>
             <View>
               <Text style={styles.cardTitle}>{shipment.id}</Text>
-              <Text style={styles.caption}>{shipment.product}</Text>
+              <Text style={styles.caption}>{t.entities[shipment.product]}</Text>
             </View>
             <Badge tone={shipment.readiness === 100 ? "success" : "warning"}>
-              {shipment.status}
+              {t.shipments.statuses[shipment.status]}
             </Badge>
           </View>
           <View style={styles.shipmentDetail}>
             <View>
-              <Text style={styles.caption}>Herkunft</Text>
-              <Text style={styles.detailValue}>{shipment.origin}</Text>
+              <Text style={styles.caption}>{t.shipments.origin}</Text>
+              <Text style={styles.detailValue}>{shipment.origin}, {t.shipments.ethiopia}</Text>
             </View>
             <View>
-              <Text style={styles.caption}>Menge</Text>
+              <Text style={styles.caption}>{t.shipments.quantity}</Text>
               <Text style={styles.detailValue}>{shipment.quantity}</Text>
             </View>
           </View>
           <View style={styles.progressHeader}>
-            <Text style={styles.caption}>DDS-Bereitschaft</Text>
+            <Text style={styles.caption}>{t.shipments.readiness}</Text>
             <Text style={styles.progressValue}>{shipment.readiness}%</Text>
           </View>
           <View style={styles.progressTrack}>
@@ -557,47 +557,19 @@ function ShipmentsScreen() {
   );
 }
 
-function HelpScreen({
-  language,
-  setLanguage,
-}: {
-  language: Language;
-  setLanguage: (language: Language) => void;
-}) {
-  const content = copy[language];
+function HelpScreen({ t }: { t: Translation }) {
   return (
     <>
       <SectionTitle
-        eyebrow="FIELD GUIDE"
-        title={content.title}
-        description={content.guideIntro}
+        eyebrow={t.help.eyebrow}
+        title={t.help.title}
+        description={t.help.intro}
       />
-      <View style={styles.languageSwitch}>
-        {(["de", "en", "am"] as Language[]).map((item) => (
-          <Pressable
-            key={item}
-            onPress={() => setLanguage(item)}
-            style={[
-              styles.languageButton,
-              language === item && styles.languageButtonActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.languageButtonText,
-                language === item && styles.languageButtonTextActive,
-              ]}
-            >
-              {item === "de" ? "DE" : item === "en" ? "EN" : "አማ"}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>{content.guideTitle}</Text>
+        <Text style={styles.cardTitle}>{t.help.guideTitle}</Text>
         <View style={styles.guideSteps}>
-          {content.steps.map((step, index) => (
+          {t.help.steps.map((step, index) => (
             <View key={step} style={styles.guideStep}>
               <View style={styles.guideNumber}>
                 <Text style={styles.guideNumberText}>{index + 1}</Text>
@@ -611,41 +583,153 @@ function HelpScreen({
       <View style={styles.privacyCard}>
         <Ionicons name="shield-checkmark" size={25} color={palette.forest} />
         <View style={styles.flex}>
-          <Text style={styles.taskTitle}>Datenschutz</Text>
-          <Text style={styles.taskDetail}>{content.privacy}</Text>
+          <Text style={styles.taskTitle}>{t.help.privacyTitle}</Text>
+          <Text style={styles.taskDetail}>{t.help.privacy}</Text>
         </View>
       </View>
 
       <View style={styles.prototypeNotice}>
         <Ionicons name="flask" size={20} color={palette.amber} />
         <Text style={styles.prototypeText}>
-          Prototyp · nur Kaffee · keine Live-EU-Einreichung
+          {t.help.prototype}
         </Text>
       </View>
     </>
   );
 }
 
+function LanguageChooser({
+  visible,
+  language,
+  onSelect,
+  onClose,
+  t,
+}: {
+  visible: boolean;
+  language: Language;
+  onSelect: (language: Language) => void;
+  onClose: () => void;
+  t: Translation;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      accessibilityViewIsModal
+    >
+      <View style={styles.modalBackdrop} accessibilityViewIsModal>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel={t.accessibility.dismissLanguageChooser}
+        />
+        <View style={styles.languageDialog}>
+          <View style={styles.dialogHeader}>
+            <View style={styles.flex}>
+              <Text style={styles.cardTitle}>{t.languageChooserTitle}</Text>
+              <Text style={styles.taskDetail}>{t.languageChooserHint}</Text>
+            </View>
+            <Pressable
+              onPress={onClose}
+              style={styles.iconButton}
+              accessibilityRole="button"
+              accessibilityLabel={t.close}
+            >
+              <Ionicons name="close" size={22} color={palette.ink} />
+            </Pressable>
+          </View>
+          {languages.map((item) => {
+            const option = translations[item];
+            const selected = language === item;
+            return (
+              <Pressable
+                key={item}
+                onPress={() => onSelect(item)}
+                style={[styles.languageOption, selected && styles.languageOptionActive]}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: selected }}
+                accessibilityLabel={option.languageName}
+              >
+                <Text style={[styles.languageCode, selected && styles.languageOptionTextActive]}>
+                  {option.languageCode}
+                </Text>
+                <Text style={[styles.languageName, selected && styles.languageOptionTextActive]}>
+                  {option.languageName}
+                </Text>
+                {selected ? <Ionicons name="checkmark" size={20} color="#FFFFFF" /> : null}
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [language, setLanguage] = useState<Language>("de");
+  const [languageLoaded, setLanguageLoaded] = useState(false);
+  const [languageChooserOpen, setLanguageChooserOpen] = useState(false);
   const [drafts, setDrafts] = useState<PlotDraft[]>([]);
   const [storageLoaded, setStorageLoaded] = useState(false);
+  const languageChosen = useRef(false);
+  const selectedLanguage = useRef<Language>("de");
+  const t = translations[language];
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((stored) => {
-        if (stored) {
-          setDrafts(JSON.parse(stored) as PlotDraft[]);
+    let cancelled = false;
+
+    async function loadPersistedState() {
+      let startupLanguage: Language = "de";
+
+      try {
+        const storedLanguage = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
+        if (isLanguage(storedLanguage)) {
+          startupLanguage = storedLanguage;
         }
-      })
-      .catch(() => {
+      } catch {
+        // German remains the safe startup fallback if the preference cannot be read.
+      }
+
+      if (!cancelled) {
+        if (!languageChosen.current) {
+          selectedLanguage.current = startupLanguage;
+          setLanguage(startupLanguage);
+        }
+        setLanguageLoaded(true);
+      }
+
+      try {
+        const stored = await AsyncStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          if (!cancelled) {
+            setDrafts(JSON.parse(stored) as PlotDraft[]);
+          }
+        }
+      } catch {
+        if (cancelled) {
+          return;
+        }
+        const startupTranslation = translations[selectedLanguage.current];
         Alert.alert(
-          "Lokale Daten nicht verfügbar",
-          "Gespeicherte Plot-Entwürfe konnten nicht gelesen werden.",
+          startupTranslation.capture.alerts.readErrorTitle,
+          startupTranslation.capture.alerts.readErrorMessage,
         );
-      })
-      .finally(() => setStorageLoaded(true));
+      } finally {
+        if (!cancelled) {
+          setStorageLoaded(true);
+        }
+      }
+    }
+
+    void loadPersistedState();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -655,36 +739,68 @@ export default function App() {
 
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(drafts)).catch(() => {
       Alert.alert(
-        "Speichern fehlgeschlagen",
-        "Der Plot-Entwurf konnte nicht sicher auf diesem Gerät gespeichert werden.",
+        t.capture.alerts.saveErrorTitle,
+        t.capture.alerts.saveErrorMessage,
       );
     });
-  }, [drafts, storageLoaded]);
+  }, [drafts, storageLoaded, t.capture.alerts.saveErrorMessage, t.capture.alerts.saveErrorTitle]);
+
+  function selectLanguage(nextLanguage: Language) {
+    languageChosen.current = true;
+    selectedLanguage.current = nextLanguage;
+    setLanguage(nextLanguage);
+    setLanguageChooserOpen(false);
+    AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, nextLanguage).catch(() => {
+      const nextTranslation = translations[nextLanguage];
+      Alert.alert(
+        nextTranslation.languageSaveErrorTitle,
+        nextTranslation.languageSaveErrorMessage,
+      );
+    });
+  }
 
   const screen = useMemo(() => {
     switch (activeTab) {
       case "suppliers":
-        return <SuppliersScreen />;
+        return <SuppliersScreen t={t} />;
       case "capture":
         return (
           <CaptureScreen
             drafts={drafts}
             onDraftSaved={(draft) => setDrafts((current) => [draft, ...current])}
+            t={t}
           />
         );
       case "shipments":
-        return <ShipmentsScreen />;
+        return <ShipmentsScreen t={t} />;
       case "help":
-        return <HelpScreen language={language} setLanguage={setLanguage} />;
+        return <HelpScreen t={t} />;
       default:
         return (
           <HomeScreen
             drafts={drafts}
             onCapture={() => setActiveTab("capture")}
+            t={t}
           />
         );
     }
-  }, [activeTab, drafts, language]);
+  }, [activeTab, drafts, t]);
+
+  if (!languageLoaded) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar style="light" />
+        <View
+          style={styles.loading}
+          accessible
+          accessibilityRole="progressbar"
+          accessibilityLabel="SCTracker"
+        >
+          <ActivityIndicator size="large" color={palette.lime} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -695,12 +811,22 @@ export default function App() {
         </View>
         <View style={styles.flex}>
           <Text style={styles.brand}>SCTracker</Text>
-          <Text style={styles.brandSubtitle}>Coffee Evidence</Text>
+          <Text style={styles.brandSubtitle}>{t.brandSubtitle}</Text>
         </View>
         <View style={styles.offlinePill}>
           <View style={styles.offlineDot} />
-          <Text style={styles.offlineText}>Offline bereit</Text>
+          <Text style={styles.offlineText}>{t.offlineReady}</Text>
         </View>
+        <Pressable
+          style={styles.headerLanguageButton}
+          onPress={() => setLanguageChooserOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={t.accessibility.chooseLanguage}
+          accessibilityHint={t.accessibility.currentLanguage}
+        >
+          <Ionicons name="language" size={21} color="#FFFFFF" />
+          <Text style={styles.headerLanguageCode}>{t.languageCode}</Text>
+        </Pressable>
       </View>
 
       <ScrollView
@@ -715,35 +841,44 @@ export default function App() {
         <TabButton
           active={activeTab === "home"}
           icon="home"
-          label="Start"
+          label={t.tabs.home}
           onPress={() => setActiveTab("home")}
         />
         <TabButton
           active={activeTab === "suppliers"}
           icon="people"
-          label="Partner"
+          label={t.tabs.suppliers}
           onPress={() => setActiveTab("suppliers")}
         />
         <Pressable
           style={styles.captureTab}
           onPress={() => setActiveTab("capture")}
-          accessibilityLabel="Kaffee-Plot erfassen"
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === "capture" }}
+          accessibilityLabel={t.tabs.capture}
         >
           <Ionicons name="locate" size={25} color="#FFFFFF" />
         </Pressable>
         <TabButton
           active={activeTab === "shipments"}
           icon="cube"
-          label="Sendungen"
+          label={t.tabs.shipments}
           onPress={() => setActiveTab("shipments")}
         />
         <TabButton
           active={activeTab === "help"}
           icon="help-circle"
-          label="Hilfe"
+          label={t.tabs.help}
           onPress={() => setActiveTab("help")}
         />
       </View>
+      <LanguageChooser
+        visible={languageChooserOpen}
+        language={language}
+        onSelect={selectLanguage}
+        onClose={() => setLanguageChooserOpen(false)}
+        t={t}
+      />
     </SafeAreaView>
   );
 }
@@ -753,6 +888,11 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: Platform.OS === "android" ? NativeStatusBar.currentHeight : 0,
     backgroundColor: palette.ink,
+  },
+  loading: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   appHeader: {
     minHeight: 70,
@@ -804,6 +944,21 @@ const styles = StyleSheet.create({
     color: "#D9E2DC",
     fontSize: 9,
     fontWeight: "700",
+  },
+  headerLanguageButton: {
+    minWidth: 45,
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  headerLanguageCode: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "800",
   },
   scroll: {
     flex: 1,
@@ -1157,31 +1312,60 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: palette.forest,
   },
-  languageSwitch: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 1,
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: "center",
+    padding: 24,
+    backgroundColor: "rgba(10,25,18,0.62)",
   },
-  languageButton: {
-    minWidth: 56,
-    alignItems: "center",
-    paddingHorizontal: 13,
-    paddingVertical: 9,
-    borderWidth: 1,
-    borderColor: palette.line,
-    borderRadius: 9,
+  languageDialog: {
+    gap: 9,
+    padding: 20,
+    borderRadius: 18,
     backgroundColor: palette.panel,
   },
-  languageButtonActive: {
+  dialogHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 8,
+  },
+  iconButton: {
+    width: 42,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 21,
+    backgroundColor: palette.paper,
+  },
+  languageOption: {
+    minHeight: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: palette.line,
+    borderRadius: 11,
+    backgroundColor: "#FFFFFF",
+  },
+  languageOptionActive: {
     borderColor: palette.forest,
     backgroundColor: palette.forest,
   },
-  languageButtonText: {
-    color: palette.muted,
+  languageCode: {
+    width: 36,
+    color: palette.forest,
     fontSize: 11,
-    fontWeight: "800",
+    fontWeight: "900",
   },
-  languageButtonTextActive: {
+  languageName: {
+    flex: 1,
+    color: palette.ink,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  languageOptionTextActive: {
     color: "#FFFFFF",
   },
   guideSteps: {
