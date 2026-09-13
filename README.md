@@ -34,6 +34,14 @@ npm start
 
 See `mobile\README.md` for Android, iOS, and EAS build instructions.
 
+## Backend platform
+
+The production-oriented TypeScript/Fastify API, PostgreSQL/PostGIS migrations, and asynchronous
+worker are isolated in `backend\`. Existing web and Expo workflows do not depend on it.
+
+See `backend\README.md` for local setup, API contracts, S3 Object Lock requirements, worker
+operation, and Railway deployment.
+
 ## Tests
 
 ```powershell
