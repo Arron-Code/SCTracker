@@ -1150,7 +1150,6 @@ tr:last-child td {
 
 .workflow-dialog::backdrop {
   background: rgba(20, 37, 29, 0.64);
-  backdrop-filter: blur(3px);
 }
 
 .dialog-shell {
