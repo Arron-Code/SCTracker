@@ -1,4 +1,5 @@
 import { createApiClient, ApiError } from "./src/api.mjs?v=2";
+import { createManagedAuth, AuthError } from "./src/auth.mjs?v=1";
 import { calculateCompletion, validateMassBalance } from "./src/domain.mjs?v=1";
 import { parseGeoJson } from "./src/geojson.mjs?v=2";
 import {
@@ -7,7 +8,8 @@ import {
   translate,
 } from "./src/i18n.mjs?v=2";
 
-const api = createApiClient();
+const auth = createManagedAuth();
+const api = createApiClient({ tokenProvider: () => auth.token() });
 const completion = calculateCompletion({
   supplier: true,
   plots: true,
@@ -44,9 +46,31 @@ const dialogContent = document.querySelector("#dialog-content");
 const dialogError = document.querySelector("#dialog-error");
 const dialogSubmit = document.querySelector("#dialog-submit");
 const languageButtons = [...document.querySelectorAll("[data-language]")];
+const authDialog = document.querySelector("#auth-dialog");
+const authButton = document.querySelector("#auth-button");
+const authSignedOut = document.querySelector("#auth-signed-out");
+const authSignedIn = document.querySelector("#auth-signed-in");
+const authError = document.querySelector("#auth-error");
+const authStatus = document.querySelector("#auth-status");
+const authIdentity = document.querySelector("#auth-identity");
+const authOrganization = document.querySelector("#auth-organization");
+const authSubmit = document.querySelector("#auth-submit");
+const authMode = document.querySelector("#auth-mode");
+const authNameField = document.querySelector("#auth-name-field");
+const organizationForm = document.querySelector("#organization-form");
+const organizationSelect = document.querySelector("#organization-select");
+const organizationSelectButton = document.querySelector("#organization-select-button");
+const signOutButton = document.querySelector("#sign-out-button");
 let activeDialog;
 let activeLanguage = getInitialLanguage();
 let toastTimer;
+let authAction = "signIn";
+const authState = {
+  loading: auth.configured,
+  session: null,
+  organizations: [],
+  error: null,
+};
 
 function t(key) {
   return translate(activeLanguage, key);
@@ -79,11 +103,23 @@ function showToast(message, kind = "success") {
 }
 
 function errorMessage(error) {
+  if (error instanceof AuthError && error.code === "AUTH_NOT_CONFIGURED") {
+    return t("auth.notConfiguredDetail");
+  }
+  if (error instanceof AuthError) {
+    return error.message || t("auth.error");
+  }
   if (error instanceof ApiError && error.code === "NOT_CONFIGURED") {
     return t("error.notConfigured");
   }
   if (error instanceof ApiError && error.code === "NETWORK_UNAVAILABLE") {
     return t("error.network");
+  }
+  if (error instanceof ApiError && error.code === "AUTH_NOT_CONFIGURED") {
+    return t("auth.notConfiguredDetail");
+  }
+  if (error instanceof ApiError && error.code === "AUTH_REQUIRED") {
+    return t("auth.organizationRequired");
   }
   if (error instanceof ApiError && ["HTTP_ERROR", "INVALID_RESPONSE"].includes(error.code)) {
     return t("error.generic");
@@ -192,6 +228,18 @@ function renderShipments() {
     </tr>`).join("");
 }
 
+function clearResources() {
+  state.suppliers = [];
+  state.plots = [];
+  state.shipments = [];
+  state.errors.suppliers = null;
+  state.errors.plots = null;
+  state.errors.shipments = null;
+  renderSuppliers();
+  renderPlots();
+  renderShipments();
+}
+
 async function loadResources() {
   const supplierTarget = document.querySelector("#supplier-rows");
   const shipmentTarget = document.querySelector("#shipment-rows");
@@ -228,12 +276,101 @@ function setLanguage(language) {
   renderSuppliers();
   renderPlots();
   renderShipments();
+  renderAuth();
   showView(location.hash.slice(1) || "overview");
   languageButtons.forEach((button) => {
     const isActive = button.dataset.language === language;
     button.classList.toggle("active", isActive);
     button.setAttribute("aria-pressed", String(isActive));
   });
+}
+
+function setAuthBusy(busy) {
+  authSubmit.disabled = busy;
+  authMode.disabled = busy;
+  organizationSelectButton.disabled = busy || !organizationSelect.value;
+  signOutButton.disabled = busy;
+  authStatus.textContent = busy ? t("auth.loading") : "";
+}
+
+function renderAuth() {
+  const session = authState.session;
+  authButton.textContent = session?.user?.name ?? t("auth.account");
+  authButton.setAttribute("aria-label", session ? t("auth.manage") : t("auth.signIn"));
+  authSignedOut.hidden = Boolean(session);
+  authSignedIn.hidden = !session;
+  authError.textContent = authState.error ? errorMessage(authState.error) : "";
+  authStatus.textContent = authState.loading ? t("auth.loading") : "";
+
+  if (!auth.configured) {
+    authError.textContent = t("auth.notConfiguredDetail");
+    return;
+  }
+  if (!session) {
+    authSubmit.textContent = t(authAction === "signIn" ? "auth.signIn" : "auth.signUp");
+    authMode.textContent = t(authAction === "signIn" ? "auth.needAccount" : "auth.haveAccount");
+    authNameField.hidden = authAction === "signIn";
+    authNameField.querySelector("input").required = authAction === "signUp";
+    return;
+  }
+
+  authIdentity.textContent = `${session.user.name} · ${session.user.email}`;
+  const activeId = session.session.activeOrganizationId;
+  organizationSelect.innerHTML = [
+    `<option value="">${escapeHtml(t("auth.selectOrganization"))}</option>`,
+    ...authState.organizations.map((organization) => `
+      <option value="${escapeHtml(organization.id)}" ${organization.id === activeId ? "selected" : ""}>
+        ${escapeHtml(organization.name)}
+      </option>`),
+  ].join("");
+  organizationSelectButton.disabled = !organizationSelect.value;
+  if (!activeId) {
+    authError.textContent = t("auth.organizationRequired");
+  }
+}
+
+async function refreshAuth() {
+  if (!auth.configured) {
+    authState.loading = false;
+    renderAuth();
+    return;
+  }
+  authState.loading = true;
+  authState.error = null;
+  renderAuth();
+  try {
+    authState.session = await auth.getSession();
+    authState.organizations = authState.session
+      ? await auth.listOrganizations()
+      : [];
+    if (!authState.session?.session?.activeOrganizationId) {
+      clearResources();
+    }
+  } catch (error) {
+    authState.error = error;
+    authState.session = null;
+    authState.organizations = [];
+  } finally {
+    authState.loading = false;
+    renderAuth();
+  }
+}
+
+async function runAuthAction(action) {
+  setAuthBusy(true);
+  authState.error = null;
+  try {
+    await action();
+    await refreshAuth();
+    if (authState.session?.session?.activeOrganizationId) {
+      await loadResources();
+    }
+  } catch (error) {
+    authState.error = error;
+    renderAuth();
+  } finally {
+    setAuthBusy(false);
+  }
 }
 
 function field(name, labelKey, options = {}) {
@@ -455,7 +592,52 @@ dialog.addEventListener("close", () => {
   dialog.querySelector("form").reset();
   activeDialog = null;
 });
+authButton.addEventListener("click", () => {
+  renderAuth();
+  authDialog.showModal();
+});
+authDialog.querySelector(".dialog-close").addEventListener("click", () => authDialog.close());
+authMode.addEventListener("click", () => {
+  authAction = authAction === "signIn" ? "signUp" : "signIn";
+  renderAuth();
+});
+authSignedOut.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const form = new FormData(authSignedOut);
+  void runAuthAction(() => authAction === "signIn"
+    ? auth.signIn(form.get("email").trim(), form.get("password"))
+    : auth.signUp(form.get("name").trim(), form.get("email").trim(), form.get("password")));
+});
+organizationForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const form = new FormData(organizationForm);
+  void runAuthAction(() => auth.createOrganization(
+    form.get("name").trim(),
+    form.get("slug").trim(),
+  ));
+});
+organizationSelect.addEventListener("change", () => {
+  organizationSelectButton.disabled = !organizationSelect.value;
+});
+organizationSelectButton.addEventListener("click", () => {
+  if (organizationSelect.value) {
+    void runAuthAction(() => auth.setActiveOrganization(organizationSelect.value));
+  }
+});
+signOutButton.addEventListener("click", () => void runAuthAction(async () => {
+  await auth.signOut();
+  authState.session = null;
+  authState.organizations = [];
+  clearResources();
+}));
 
 if (!balance.balanced) console.warn("Shipment mass balance is not balanced", balance);
 setLanguage(activeLanguage);
-loadResources();
+void refreshAuth().then(() => {
+  if (authState.session?.session?.activeOrganizationId) {
+    return loadResources();
+  }
+  renderSuppliers();
+  renderPlots();
+  renderShipments();
+});

@@ -22,6 +22,13 @@ export class ApiError extends Error {
   }
 }
 
+export type AccessTokenProvider = () => Promise<string | null>;
+let accessTokenProvider: AccessTokenProvider | null = null;
+
+export function configureApiAuth(provider: AccessTokenProvider | null) {
+  accessTokenProvider = provider;
+}
+
 export function getApiBaseUrl(): string | null {
   const value = process.env.EXPO_PUBLIC_API_URL?.trim();
   return value ? value.replace(/\/+$/, "") : null;
@@ -35,12 +42,24 @@ async function request<T>(
   if (!baseUrl) {
     throw new ApiError("NOT_CONFIGURED", "EXPO_PUBLIC_API_URL is not configured.", 0);
   }
+  if (!accessTokenProvider) {
+    throw new ApiError(
+      "AUTH_NOT_CONFIGURED",
+      "Neon Auth token provider is not configured.",
+      0,
+    );
+  }
+  const token = await accessTokenProvider();
+  if (!token) {
+    throw new ApiError("AUTH_REQUIRED", "Sign in and select an organization.", 401);
+  }
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
     headers: {
       Accept: "application/json",
       ...(init?.body ? { "Content-Type": "application/json" } : {}),
       ...init?.headers,
+      Authorization: `Bearer ${token}`,
     },
   });
   const body: unknown = await response.json().catch(() => null);

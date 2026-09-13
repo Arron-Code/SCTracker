@@ -87,6 +87,22 @@ export type Translation = {
   };
   help: { title: string; body: string };
   alerts: { required: string; saved: string; storageError: string };
+  auth: {
+    signIn: string;
+    signUp: string;
+    signOut: string;
+    needAccount: string;
+    haveAccount: string;
+    email: string;
+    password: string;
+    organization: string;
+    organizationRequired: string;
+    organizationName: string;
+    organizationSlug: string;
+    createOrganization: string;
+    notConfigured: string;
+    notConfiguredDetail: string;
+  };
 };
 
 export const translations = {
@@ -137,6 +153,15 @@ export const translations = {
       body: "GPS- und Personendaten nur mit Einwilligung erfassen. Lokale Änderungen bleiben bis zur bestätigten Synchronisierung erhalten. Konflikte werden nie automatisch überschrieben.",
     },
     alerts: { required: "Bitte alle erforderlichen Felder ausfüllen.", saved: "Offline gespeichert.", storageError: "Lokale Daten konnten nicht sicher gespeichert werden." },
+    auth: {
+      signIn: "Anmelden", signUp: "Konto erstellen", signOut: "Abmelden",
+      needAccount: "Neues Konto erstellen", haveAccount: "Vorhandenes Konto verwenden",
+      email: "E-Mail", password: "Passwort", organization: "Aktive Organisation",
+      organizationRequired: "Wählen oder erstellen Sie eine Organisation, bevor Sie synchronisieren.",
+      organizationName: "Organisationsname", organizationSlug: "Organisationskürzel",
+      createOrganization: "Organisation erstellen", notConfigured: "Neon Auth nicht konfiguriert",
+      notConfiguredDetail: "EXPO_PUBLIC_NEON_AUTH_URL fehlt. Offline-Erfassung bleibt verfügbar; Synchronisierung ist blockiert.",
+    },
   },
   en: {
     languageName: "English", languageCode: "EN", chooseLanguage: "Choose language",
@@ -184,6 +209,15 @@ export const translations = {
       body: "Capture GPS and personal data only with consent. Local changes remain until sync is confirmed. Conflicts are never overwritten automatically.",
     },
     alerts: { required: "Complete all required fields.", saved: "Saved offline.", storageError: "Local data could not be stored safely." },
+    auth: {
+      signIn: "Sign in", signUp: "Create account", signOut: "Sign out",
+      needAccount: "Create a new account", haveAccount: "Use an existing account",
+      email: "Email", password: "Password", organization: "Active organization",
+      organizationRequired: "Select or create an organization before synchronizing.",
+      organizationName: "Organization name", organizationSlug: "Organization slug",
+      createOrganization: "Create organization", notConfigured: "Neon Auth not configured",
+      notConfiguredDetail: "EXPO_PUBLIC_NEON_AUTH_URL is missing. Offline capture remains available; synchronization is blocked.",
+    },
   },
   am: {
     languageName: "አማርኛ", languageCode: "አማ", chooseLanguage: "ቋንቋ ይምረጡ",
@@ -231,6 +265,15 @@ export const translations = {
       body: "GPS እና የግል መረጃን በፈቃድ ብቻ ይመዝግቡ። የአካባቢ ለውጦች ማመሳሰል እስኪረጋገጥ ይቆያሉ። ግጭቶች በራስ-ሰር አይተኩም።",
     },
     alerts: { required: "እባክዎ ሁሉንም አስፈላጊ መስኮች ይሙሉ።", saved: "ከመስመር ውጭ ተቀምጧል።", storageError: "የአካባቢ ውሂብ በደህንነት ሊቀመጥ አልቻለም።" },
+    auth: {
+      signIn: "ግባ", signUp: "መለያ ፍጠር", signOut: "ውጣ",
+      needAccount: "አዲስ መለያ ፍጠር", haveAccount: "ያለውን መለያ ተጠቀም",
+      email: "ኢሜይል", password: "የይለፍ ቃል", organization: "ንቁ ድርጅት",
+      organizationRequired: "ከማመሳሰልዎ በፊት ድርጅት ይምረጡ ወይም ይፍጠሩ።",
+      organizationName: "የድርጅት ስም", organizationSlug: "የድርጅት አጭር መለያ",
+      createOrganization: "ድርጅት ፍጠር", notConfigured: "Neon Auth አልተዋቀረም",
+      notConfiguredDetail: "EXPO_PUBLIC_NEON_AUTH_URL የለም። ከመስመር ውጭ መመዝገብ ይቀጥላል፤ ማመሳሰል ታግዷል።",
+    },
   },
   ti: {
     languageName: "ትግርኛ", languageCode: "ትግ", chooseLanguage: "ቋንቋ ምረጹ",
@@ -278,6 +321,15 @@ export const translations = {
       body: "GPSን ውልቃዊ ሓበሬታን ብፍቓድ ጥራይ መዝግቡ። ናይ መሳርሒ ለውጥታት ምትእስሳር ክሳብ ዝረጋገጽ ይጸንሑ። ግጭታት ብራስ-ሰር ኣይትክኡን።",
     },
     alerts: { required: "በጃኹም ኩሎም ዘድልዩ ቦታታት ምልኡ።", saved: "ካብ መስመር ወጻኢ ተዓቂቡ።", storageError: "ናይ መሳርሒ ዳታ ብውሕስነት ክዕቀብ ኣይከኣለን።" },
+    auth: {
+      signIn: "እቶ", signUp: "መለያ ፍጠር", signOut: "ውጻእ",
+      needAccount: "ሓድሽ መለያ ፍጠር", haveAccount: "ዘሎ መለያ ተጠቐም",
+      email: "ኢመይል", password: "መሕለፊ ቓል", organization: "ንጡፍ ትካል",
+      organizationRequired: "ቅድሚ ምትእስሳር ትካል ምረጹ ወይ ፍጠሩ።",
+      organizationName: "ስም ትካል", organizationSlug: "ሓጺር መለለዪ ትካል",
+      createOrganization: "ትካል ፍጠር", notConfigured: "Neon Auth ኣይተዋቐረን",
+      notConfiguredDetail: "EXPO_PUBLIC_NEON_AUTH_URL የለን። ካብ መስመር ወጻኢ ምምዝጋብ ይቕጽል፤ ምትእስሳር ተዓጽዩ።",
+    },
   },
 } satisfies Record<Language, Translation>;
 

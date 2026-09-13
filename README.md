@@ -30,10 +30,23 @@ By default, the web client calls the same origin under `/api/v1`. Deployments ca
 ```html
 <script>
   window.SC_TRACKER_CONFIG = {
-    SC_TRACKER_API_URL: "https://api.example.com/api/v1"
+    SC_TRACKER_API_URL: "https://api.example.com/api/v1",
+    SC_TRACKER_NEON_AUTH_URL: "https://your-neon-auth-host.example/neondb/auth"
   };
 </script>
 ```
+
+`config.example.js` documents the public runtime values. Copy its shape into a
+deployment-provided script or inline configuration loaded before `app.js`.
+Neither value is a secret. The repository bundles the pinned
+`@neondatabase/auth` browser client locally with `npm run build:auth`; production
+does not execute third-party CDN code.
+
+The account dialog supports email sign-up, sign-in, sign-out, and organization
+creation/selection. API requests call Neon Auth's `token()` endpoint immediately
+before each request and send the returned short-lived JWT as
+`Authorization: Bearer <token>`. Raw JWTs are never written to `localStorage`.
+Users must select an active organization before protected API data is loaded.
 
 The client expects successful responses as `{ "data": ..., "meta": ... }` and errors as `{ "error": { "code": "...", "message": "...", "details": ... } }`. It integrates:
 
@@ -59,10 +72,20 @@ The Android and iOS application is located in `mobile\`. It uses Expo and React 
 
 ```powershell
 Set-Location mobile
+npm install
+Copy-Item .env.example .env
 npm start
 ```
 
 See `mobile\README.md` for Android, iOS, and EAS build instructions.
+
+Set `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_NEON_AUTH_URL` in `mobile\.env`.
+These URLs are public configuration, not secrets. Native auth cookies are kept
+by the official Better Auth Expo plugin in `expo-secure-store`; raw JWTs are
+requested with `token()` for each API call and are never saved in AsyncStorage.
+Offline supplier and plot capture remains available while signed out or
+disconnected, and the existing outbox is retained until authenticated sync
+succeeds.
 
 ## Native iOS reference
 
@@ -97,7 +120,19 @@ operation, and Railway deployment.
 ```powershell
 npm test
 npm run check
+npm run build:auth
+
+Set-Location mobile
+npm test
+npm run typecheck
+npx expo-doctor
 ```
+
+## Backend authentication contract
+
+The API validates the Neon-issued JWT and derives its internal UUID principals
+from the signed `sub` and `activeOrganizationId` claims. Clients never send
+user- or organization-ID overrides and never derive backend UUIDs themselves.
 
 ## Documentation
 

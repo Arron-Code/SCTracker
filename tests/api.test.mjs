@@ -34,6 +34,7 @@ test("runtime configuration defaults to same-origin API and requires explicit mo
 test("API errors preserve the provider code and never become success data", async () => {
   const client = createApiClient({
     config: { apiUrl: "/api/v1" },
+    tokenProvider: async () => "jwt-test",
     fetchImpl: async () =>
       jsonResponse(
         { error: { code: "NOT_CONFIGURED", message: "Provider unavailable" } },
@@ -54,11 +55,13 @@ test("resource and job requests use the documented endpoints and JSON shapes", a
   const calls = [];
   const client = createApiClient({
     config: { SC_TRACKER_API_URL: "https://api.example.test/api/v1" },
+    tokenProvider: async () => "jwt-test",
     fetchImpl: async (url, init = {}) => {
       calls.push({
         url,
         method: init.method ?? "GET",
         body: init.body ? JSON.parse(init.body) : undefined,
+        authorization: new Headers(init.headers).get("authorization"),
       });
       return jsonResponse({ data: { id: "created-1", status: "queued" } });
     },
@@ -98,12 +101,14 @@ test("resource and job requests use the documented endpoints and JSON shapes", a
     shipmentId: "shipment-1",
     action: "validate",
   });
+  assert.ok(calls.every((call) => call.authorization === "Bearer jwt-test"));
 });
 
 test("document upload initiates, uploads bytes, and completes the document", async () => {
   const calls = [];
   const client = createApiClient({
     config: { apiUrl: "/api/v1" },
+    tokenProvider: async () => "jwt-test",
     fetchImpl: async (url, init = {}) => {
       calls.push({ url, init });
       if (url === "/api/v1/documents/uploads") {
@@ -139,4 +144,28 @@ test("document upload initiates, uploads bytes, and completes the document", asy
   });
   assert.equal(calls[1].init.method, "PUT");
   assert.equal(calls[2].url, "/api/v1/documents/doc-1/complete");
+});
+
+test("API requests obtain a fresh token and fail clearly when auth is unavailable", async () => {
+  let tokenCalls = 0;
+  const client = createApiClient({
+    config: { apiUrl: "/api/v1" },
+    tokenProvider: async () => `jwt-${++tokenCalls}`,
+    fetchImpl: async (_url, init) => jsonResponse({
+      data: { authorization: new Headers(init.headers).get("authorization") },
+    }),
+  });
+
+  assert.equal((await client.suppliers.list()).data.authorization, "Bearer jwt-1");
+  assert.equal((await client.plots.list()).data.authorization, "Bearer jwt-2");
+  assert.equal(tokenCalls, 2);
+
+  const unconfigured = createApiClient({
+    config: { apiUrl: "/api/v1" },
+    fetchImpl: async () => jsonResponse({ data: [] }),
+  });
+  await assert.rejects(
+    unconfigured.suppliers.list(),
+    (error) => error instanceof ApiError && error.code === "AUTH_NOT_CONFIGURED",
+  );
 });

@@ -80,7 +80,9 @@
               <small data-i18n="header.applicationStart">Anwendungsstart</small>
               <strong data-i18n="header.date">30. Dez. 2026</strong>
             </span>
-            <button class="avatar" aria-label="Benutzermenü" data-i18n-aria-label="aria.userMenu">AJ</button>
+            <button class="auth-button" id="auth-button" type="button" aria-label="Benutzermenü" data-i18n-aria-label="aria.userMenu">
+              <span data-i18n="auth.account">Konto</span>
+            </button>
           </div>
         </header>
 
@@ -400,6 +402,52 @@
         </div>
       </form>
     </dialog>
-    <script type="module" src="app.js?v=2"></script>
+    <dialog class="workflow-dialog" id="auth-dialog" aria-labelledby="auth-dialog-title">
+      <div class="dialog-shell">
+        <div class="panel-header">
+          <h2 id="auth-dialog-title" data-i18n="auth.account">Konto</h2>
+          <button class="dialog-close" type="button" aria-label="Schließen" data-i18n-aria-label="common.close">×</button>
+        </div>
+        <div id="auth-status" role="status" aria-live="polite"></div>
+        <div class="form-error" id="auth-error" role="alert"></div>
+        <form class="auth-form" id="auth-signed-out">
+          <label id="auth-name-field" hidden>
+            <span data-i18n="form.name">Name</span>
+            <input name="name" autocomplete="name" />
+          </label>
+          <label>
+            <span data-i18n="form.email">E-Mail</span>
+            <input name="email" type="email" autocomplete="email" required />
+          </label>
+          <label>
+            <span data-i18n="auth.password">Passwort</span>
+            <input name="password" type="password" autocomplete="current-password" minlength="8" required />
+          </label>
+          <button class="primary-button" id="auth-submit" type="submit" data-i18n="auth.signIn">Anmelden</button>
+          <button class="secondary-button" id="auth-mode" type="button" data-i18n="auth.needAccount">Neues Konto erstellen</button>
+        </form>
+        <section class="auth-form" id="auth-signed-in" hidden>
+          <strong id="auth-identity"></strong>
+          <label>
+            <span data-i18n="auth.organization">Aktive Organisation</span>
+            <select id="organization-select"></select>
+          </label>
+          <button class="secondary-button" id="organization-select-button" type="button" data-i18n="auth.select">Auswählen</button>
+          <form class="auth-form nested" id="organization-form">
+            <label>
+              <span data-i18n="auth.organizationName">Organisationsname</span>
+              <input name="name" required />
+            </label>
+            <label>
+              <span data-i18n="auth.organizationSlug">Organisationskürzel</span>
+              <input name="slug" pattern="[a-z0-9-]+" required />
+            </label>
+            <button class="primary-button" type="submit" data-i18n="auth.createOrganization">Organisation erstellen</button>
+          </form>
+          <button class="secondary-button" id="sign-out-button" type="button" data-i18n="auth.signOut">Abmelden</button>
+        </section>
+      </div>
+    </dialog>
+    <script type="module" src="app.js?v=3"></script>
   </body>
 </html>
