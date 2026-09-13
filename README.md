@@ -54,6 +54,14 @@ lifecycle, transfer, quarantine, signed-package, and guarded NFC boundaries.
 See `mobile-native\android\README.md` for build instructions and security
 limitations.
 
+## Backend platform
+
+The production-oriented TypeScript/Fastify API, PostgreSQL/PostGIS migrations, and asynchronous
+worker are isolated in `backend\`. Existing web and Expo workflows do not depend on it.
+
+See `backend\README.md` for local setup, API contracts, S3 Object Lock requirements, worker
+operation, and Railway deployment.
+
 ## Tests
 
 ```powershell
