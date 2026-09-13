@@ -169,7 +169,7 @@ private fun OverviewScreen(t: Strings) {
             MetricCard("1", t.pendingTransfers, Icons.Default.LocalShipping, Modifier.weight(1f))
         }
         SectionHeading(t.trust)
-        InfoCard("Producer · LOCAL_ATTESTED", "Device · SOFTWARE_OR_UNKNOWN")
+        InfoCard("${t.producer} · LOCAL_ATTESTED", "${t.device} · SOFTWARE_OR_UNKNOWN")
         WarningCard(t.prototype)
     }
 }
@@ -185,12 +185,12 @@ private fun SacksScreen(t: Strings) {
                 .sacks.size
         }
         if (sackCount > 0) {
-            InfoCard("B-2026-091", "$sackCount ${t.sacks} · UNISSUED")
+            InfoCard("B-2026-091", "$sackCount ${t.sacks} · ${stateLabel("UNISSUED", t)}")
         }
         SectionHeading(t.sealWorkflow)
         WarningCard(t.unconfiguredChip)
         listOf("ISSUED", "SEALED", "IN_TRANSIT", "OPENED", "VOID / DAMAGED").forEachIndexed { index, state ->
-            StatusRow(index + 1, state)
+            StatusRow(index + 1, stateLabel(state, t))
         }
     }
 }
@@ -209,7 +209,10 @@ private fun TransfersScreen(t: Strings) {
     }
     ScreenList {
         SectionHeading(t.offer)
-        InfoCard("T-2026-004 · ${transfer.decision}", "2 ${t.sacks}\n${transfer.offerHash.take(20)}…")
+        InfoCard(
+            "T-2026-004 · ${transferStatusLabel(transfer.decision, t)}",
+            "2 ${t.sacks}\n${transfer.offerHash.take(20)}…",
+        )
         Text(t.exactHash, color = Color(0xFF68766F))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(
@@ -261,10 +264,34 @@ private fun HeroCard(t: Strings) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(t.activeBatch.uppercase(), color = Color(0xFFCADB84), fontSize = 12.sp)
             Text("B-2026-091", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-            Text("Washed Arabica · Jimma", color = Color.White)
+            Text("${t.washedArabica} · Jimma", color = Color.White)
             Text("12 / 12 ${t.sacks} · 600 kg", color = Color.White, fontWeight = FontWeight.SemiBold)
         }
     }
+}
+
+private fun stateLabel(state: String, t: Strings): String {
+    val localized = when (state) {
+        "UNISSUED" -> t.unissued
+        "ISSUED" -> t.issued
+        "SEALED" -> t.sealed
+        "IN_TRANSIT" -> t.inTransit
+        "OPENED" -> t.opened
+        "VOID" -> t.voided
+        "DAMAGED" -> t.damaged
+        "VOID / DAMAGED" -> "${t.voided} / ${t.damaged}"
+        else -> state
+    }
+    return "$localized ($state)"
+}
+
+private fun transferStatusLabel(decision: TransferDecision, t: Strings): String {
+    val localized = when (decision) {
+        TransferDecision.PENDING -> t.pending
+        TransferDecision.ACCEPTED -> t.accepted
+        TransferDecision.REJECTED -> t.rejected
+    }
+    return "$localized (${decision.name})"
 }
 
 @Composable

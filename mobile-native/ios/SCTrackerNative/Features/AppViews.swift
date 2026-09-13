@@ -21,9 +21,11 @@ struct RootView: View {
             get: { model.lastError != nil },
             set: { if !$0 { model.lastError = nil } }
         )) {
-            Button("OK", role: .cancel) {}
+            Button(t(.ok), role: .cancel) {}
         } message: {
-            Text(model.lastError?.localizedDescription ?? "")
+            if let failure = model.lastError {
+                Text(L10n.error(failure, language: model.language))
+            }
         }
     }
 
@@ -112,7 +114,7 @@ private struct BatchRow: View {
                 Text("\(batch.origin) • \(batch.sackIDs.count) \(t(.sacks))")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                Text(batch.state.rawValue.replacingOccurrences(of: "_", with: " "))
+                Text(L10n.batchState(batch.state, language: model.language))
                     .font(.caption.bold())
             }
             Spacer()
@@ -178,8 +180,8 @@ struct BatchDetailView: View {
                 Section {
                     LabeledContent(t(.origin), value: batch.origin)
                     LabeledContent(t(.sacks), value: "\(batch.sackIDs.count)")
-                    LabeledContent("State", value: batch.state.rawValue)
-                    LabeledContent("Sequence", value: "\(batch.lastSequence)")
+                    LabeledContent(t(.state), value: L10n.batchState(batch.state, language: model.language))
+                    LabeledContent(t(.sequence), value: "\(batch.lastSequence)")
                 }
                 if batch.quarantined {
                     Section(t(.quarantine)) {
@@ -198,7 +200,7 @@ struct BatchDetailView: View {
                         }
                     }
                 }
-                Section("Ledger") {
+                Section(t(.ledger)) {
                     ForEach(model.snapshot.events.filter { $0.entityID == batch.id }.reversed()) { event in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(event.eventType).font(.headline)
@@ -349,9 +351,9 @@ struct ExceptionsView: View {
                         .font(.headline)
                         .foregroundStyle(Brand.danger)
                     Text(conflict.reasonCode.rawValue).font(.caption.monospaced())
-                    Text("Local: \(conflict.localHeadHash.isEmpty ? "GENESIS" : conflict.localHeadHash)")
+                    Text("\(t(.localHead)): \(conflict.localHeadHash.isEmpty ? "GENESIS" : conflict.localHeadHash)")
                         .font(.caption.monospaced())
-                    Text("Incoming prev: \(conflict.incomingPreviousHash ?? "GENESIS")")
+                    Text("\(t(.incomingPrevious)): \(conflict.incomingPreviousHash ?? "GENESIS")")
                         .font(.caption.monospaced())
                     Button {
                         model.resolveConflict(conflict.id)
@@ -401,7 +403,7 @@ struct PackageView: View {
                     systemImage: model.lastPackage == nil ? "questionmark.diamond" : "checkmark.seal.fill"
                 )
                 if let manifest = model.lastPackage?.manifest {
-                    LabeledContent("Events", value: "\(manifest.eventCount)")
+                    LabeledContent(t(.events), value: "\(manifest.eventCount)")
                     Text(manifest.chainRootHash).font(.caption.monospaced()).textSelection(.enabled)
                 }
             }
@@ -471,7 +473,7 @@ struct SettingsView: View {
                     model.signer.isDevelopmentFallback ? t(.simulatorFallback) : t(.secureEnclave),
                     systemImage: model.signer.isDevelopmentFallback ? "hammer" : "lock.shield"
                 )
-                LabeledContent("Key ID", value: model.signer.keyID)
+                LabeledContent(t(.keyID), value: model.signer.keyID)
             }
             Section(t(.chipIntegration)) {
                 Label(t(.chipDisabled), systemImage: "antenna.radiowaves.left.and.right.slash")
@@ -482,8 +484,8 @@ struct SettingsView: View {
                 ForEach(model.snapshot.actors) { actor in
                     VStack(alignment: .leading) {
                         Text(actor.displayName).font(.headline)
-                        Text("\(t(.role)): \(actor.roles.map(\.rawValue).sorted().joined(separator: ", "))")
-                        Text("\(t(.trust)): \(actor.trustState.rawValue)")
+                        Text("\(t(.role)): \(actor.roles.map { L10n.role($0, language: model.language) }.sorted().joined(separator: ", "))")
+                        Text("\(t(.trust)): \(L10n.trust(actor.trustState, language: model.language))")
                     }
                     .font(.subheadline)
                 }

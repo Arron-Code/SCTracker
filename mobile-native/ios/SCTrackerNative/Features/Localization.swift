@@ -27,11 +27,62 @@ enum TextKey: String {
     case noExceptions, quarantine, conflict, resolve, importPackage, exportPackage
     case packageVerified, packageNotVerified, trust, role, signing, secureEnclave, simulatorFallback
     case chipIntegration, chipDisabled, uidLookupOnly, language, error
+    case ok, state, sequence, ledger, localHead, incomingPrevious, events, keyID
+    case unissued, issued, sealed, inTransit, opened, voided, damaged
+    case fieldOperator, custodian, receiver, supervisor, auditor
+    case unverified, locallyTrusted, organizationVerified, revoked
 }
 
 enum L10n {
     static func text(_ key: TextKey, language: AppLanguage) -> String {
         translations[language]?[key] ?? translations[.english]![key]!
+    }
+
+    static func batchState(_ state: BatchState, language: AppLanguage) -> String {
+        let key: TextKey
+        switch state {
+        case .unissued: key = .unissued
+        case .issued: key = .issued
+        case .sealed: key = .sealed
+        case .inTransit: key = .inTransit
+        case .opened: key = .opened
+        case .void: key = .voided
+        case .damaged: key = .damaged
+        }
+        return "\(text(key, language: language)) (\(state.rawValue))"
+    }
+
+    static func role(_ role: ActorRole, language: AppLanguage) -> String {
+        let key: TextKey
+        switch role {
+        case .fieldOperator: key = .fieldOperator
+        case .custodian: key = .custodian
+        case .receiver: key = .receiver
+        case .supervisor: key = .supervisor
+        case .auditor: key = .auditor
+        }
+        return "\(text(key, language: language)) (\(role.rawValue))"
+    }
+
+    static func trust(_ state: TrustState, language: AppLanguage) -> String {
+        let key: TextKey
+        switch state {
+        case .unverified: key = .unverified
+        case .locallyTrusted: key = .locallyTrusted
+        case .organizationVerified: key = .organizationVerified
+        case .revoked: key = .revoked
+        }
+        return "\(text(key, language: language)) (\(state.rawValue))"
+    }
+
+    static func error(_ failure: SCTrackerFailure, language: AppLanguage) -> String {
+        let messages: [AppLanguage: String] = [
+            .english: "The operation was refused. Review the code and correct the input, state, trust, package, storage, or NFC condition before retrying.",
+            .german: "Der Vorgang wurde abgelehnt. Prüfen Sie den Code und korrigieren Sie Eingabe, Status, Vertrauen, Paket, Speicher oder NFC-Bedingung vor einem neuen Versuch.",
+            .amharic: "ክዋኔው ውድቅ ተደርጓል። እንደገና ከመሞከርዎ በፊት ኮዱን ይፈትሹ እና ግቤት፣ ሁኔታ፣ እምነት፣ ጥቅል፣ ማከማቻ ወይም NFC ሁኔታን ያስተካክሉ።",
+            .tigrinya: "እቲ ስርሒት ተነጺጉ። ቅድሚ ዳግማይ ምፍታን ነቲ ኮድ መርምሩ፣ እታዎት፣ ኩነታት፣ እምነት፣ ጥቕል፣ መኽዘን ወይ NFC ኩነታት ኣስተኻኽሉ።"
+        ]
+        return "\(failure.code.rawValue): \(messages[language] ?? messages[.english]!)"
     }
 
     private static let translations: [AppLanguage: [TextKey: String]] = [
@@ -54,7 +105,15 @@ enum L10n {
             .secureEnclave: "Secure Enclave P-256", .simulatorFallback: "Simulator software fallback — development only",
             .chipIntegration: "Seal chip integration", .chipDisabled: "Disabled / unconfigured",
             .uidLookupOnly: "UID is lookup only and never proof of authenticity",
-            .language: "Language", .error: "Error"
+            .language: "Language", .error: "Error", .ok: "OK", .state: "State",
+            .sequence: "Sequence", .ledger: "Ledger", .localHead: "Local head",
+            .incomingPrevious: "Incoming previous", .events: "Events", .keyID: "Key ID",
+            .unissued: "Unissued", .issued: "Issued", .sealed: "Sealed", .inTransit: "In transit",
+            .opened: "Opened", .voided: "Void", .damaged: "Damaged",
+            .fieldOperator: "Field operator", .custodian: "Custodian", .receiver: "Receiver",
+            .supervisor: "Supervisor", .auditor: "Auditor", .unverified: "Unverified",
+            .locallyTrusted: "Locally trusted", .organizationVerified: "Organization verified",
+            .revoked: "Revoked"
         ],
         .german: [
             .appTitle: "SCTracker Kaffee-Nachweise", .workflows: "Abläufe", .batches: "Chargen",
@@ -75,7 +134,15 @@ enum L10n {
             .secureEnclave: "Secure Enclave P-256", .simulatorFallback: "Simulator-Softwarefallback — nur Entwicklung",
             .chipIntegration: "Siegelchip-Integration", .chipDisabled: "Deaktiviert / nicht konfiguriert",
             .uidLookupOnly: "UID dient nur zur Suche und ist kein Echtheitsnachweis",
-            .language: "Sprache", .error: "Fehler"
+            .language: "Sprache", .error: "Fehler", .ok: "OK", .state: "Status",
+            .sequence: "Sequenz", .ledger: "Ereignisprotokoll", .localHead: "Lokaler Kopf",
+            .incomingPrevious: "Eingehender Vorgänger", .events: "Ereignisse", .keyID: "Schlüssel-ID",
+            .unissued: "Nicht ausgegeben", .issued: "Ausgegeben", .sealed: "Versiegelt", .inTransit: "Im Transport",
+            .opened: "Geöffnet", .voided: "Ungültig", .damaged: "Beschädigt",
+            .fieldOperator: "Feldoperator", .custodian: "Verwahrer", .receiver: "Empfänger",
+            .supervisor: "Aufsicht", .auditor: "Prüfer", .unverified: "Nicht verifiziert",
+            .locallyTrusted: "Lokal vertrauenswürdig", .organizationVerified: "Von Organisation verifiziert",
+            .revoked: "Widerrufen"
         ],
         .amharic: [
             .appTitle: "SCTracker የቡና ማስረጃ", .workflows: "የስራ ሂደቶች", .batches: "ባች",
@@ -96,7 +163,15 @@ enum L10n {
             .secureEnclave: "Secure Enclave P-256", .simulatorFallback: "የሲሙሌተር ሶፍትዌር — ለልማት ብቻ",
             .chipIntegration: "የማኅተም ቺፕ ግንኙነት", .chipDisabled: "ተሰናክሏል / አልተዋቀረም",
             .uidLookupOnly: "UID ለፍለጋ ብቻ ነው፤ የትክክለኛነት ማስረጃ አይደለም",
-            .language: "ቋንቋ", .error: "ስህተት"
+            .language: "ቋንቋ", .error: "ስህተት", .ok: "እሺ", .state: "ሁኔታ",
+            .sequence: "ቅደም ተከተል", .ledger: "የክስተት መዝገብ", .localHead: "የአካባቢ መጨረሻ",
+            .incomingPrevious: "የገቢ ቀዳሚ", .events: "ክስተቶች", .keyID: "የቁልፍ መለያ",
+            .unissued: "ያልተሰጠ", .issued: "የተሰጠ", .sealed: "የታሸገ", .inTransit: "በመጓጓዣ ላይ",
+            .opened: "የተከፈተ", .voided: "ዋጋ የሌለው", .damaged: "የተጎዳ",
+            .fieldOperator: "የመስክ ኦፕሬተር", .custodian: "ጠባቂ", .receiver: "ተቀባይ",
+            .supervisor: "ተቆጣጣሪ", .auditor: "ኦዲተር", .unverified: "ያልተረጋገጠ",
+            .locallyTrusted: "በአካባቢው የታመነ", .organizationVerified: "በድርጅት የተረጋገጠ",
+            .revoked: "የተሻረ"
         ],
         .tigrinya: [
             .appTitle: "SCTracker መረጋገጺ ቡን", .workflows: "መስርሓት", .batches: "ባች",
@@ -117,7 +192,15 @@ enum L10n {
             .secureEnclave: "Secure Enclave P-256", .simulatorFallback: "ሶፍትዌር ሲሙሌተር — ንልምዓት ጥራይ",
             .chipIntegration: "ምትእስሳር ቺፕ ማሕተም", .chipDisabled: "ተሰናኺሉ / ኣይተዋቐረን",
             .uidLookupOnly: "UID ንምድላይ ጥራይ እዩ፤ መረጋገጺ ትኽክለኛነት ኣይኮነን",
-            .language: "ቋንቋ", .error: "ጌጋ"
+            .language: "ቋንቋ", .error: "ጌጋ", .ok: "ሕራይ", .state: "ኩነታት",
+            .sequence: "ቅደም ተኸተል", .ledger: "መዝገብ ፍጻመ", .localHead: "ናይ ከባቢ መወዳእታ",
+            .incomingPrevious: "ዝኣቱ ቀዳማይ", .events: "ፍጻመታት", .keyID: "መለለዪ መፍትሕ",
+            .unissued: "ዘይተዋህበ", .issued: "ዝተዋህበ", .sealed: "ዝተዓሸገ", .inTransit: "ኣብ መጓዓዝያ",
+            .opened: "ዝተኸፍተ", .voided: "ዘይሰርሕ", .damaged: "ዝተጎድአ",
+            .fieldOperator: "ኦፕሬተር መስክ", .custodian: "ሓላዊ", .receiver: "ተቐባሊ",
+            .supervisor: "ተቖጻጻሪ", .auditor: "ኦዲተር", .unverified: "ዘይተረጋገጸ",
+            .locallyTrusted: "ኣብ ከባቢ ዝተኣመነ", .organizationVerified: "ብውድብ ዝተረጋገጸ",
+            .revoked: "ዝተሰረዘ"
         ]
     ]
 }

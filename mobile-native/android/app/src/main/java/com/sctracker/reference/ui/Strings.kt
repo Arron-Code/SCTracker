@@ -43,6 +43,19 @@ data class Strings(
     val trust: String,
     val prototype: String,
     val chooseLanguage: String,
+    val producer: String,
+    val device: String,
+    val washedArabica: String,
+    val unissued: String,
+    val issued: String,
+    val sealed: String,
+    val inTransit: String,
+    val opened: String,
+    val voided: String,
+    val damaged: String,
+    val pending: String,
+    val accepted: String,
+    val rejected: String,
 )
 
 val localizedStrings = mapOf(
@@ -56,6 +69,8 @@ val localizedStrings = mapOf(
         "Signed export / import", "Signature and every file hash are verified before import.",
         "Create signed package", "Verify import", "Role / trust placeholders",
         "Reference only · not production security", "Choose language",
+        "Producer", "Device", "Washed Arabica", "Unissued", "Issued", "Sealed",
+        "In transit", "Opened", "Void", "Damaged", "Pending", "Accepted", "Rejected",
     ),
     AppLanguage.DE to Strings(
         "Kaffee-Nachweise", "Offline bereit", "Übersicht", "Säcke", "Übergaben", "Ausnahmen",
@@ -67,6 +82,8 @@ val localizedStrings = mapOf(
         "Signierter Export / Import", "Signatur und jeder Datei-Hash werden vor dem Import geprüft.",
         "Signiertes Paket erstellen", "Import prüfen", "Rollen-/Vertrauensplatzhalter",
         "Nur Referenz · keine Produktionssicherheit", "Sprache auswählen",
+        "Produzent", "Gerät", "Gewaschener Arabica", "Nicht ausgegeben", "Ausgegeben", "Versiegelt",
+        "Im Transport", "Geöffnet", "Ungültig", "Beschädigt", "Ausstehend", "Angenommen", "Abgelehnt",
     ),
     AppLanguage.AM to Strings(
         "የቡና ማስረጃ", "ከመስመር ውጭ ዝግጁ", "አጠቃላይ", "ከረጢቶች", "ዝውውሮች", "ልዩ ሁኔታዎች",
@@ -78,6 +95,8 @@ val localizedStrings = mapOf(
         "የተፈረመ ላክ / አስገባ", "ከማስገባት በፊት ፊርማና የፋይል ሃሽ ይረጋገጣሉ።",
         "የተፈረመ ጥቅል ፍጠር", "ማስገባትን አረጋግጥ", "የሚና / እምነት ቦታ",
         "ማጣቀሻ ብቻ · የምርት ደህንነት አይደለም", "ቋንቋ ይምረጡ",
+        "አምራች", "መሣሪያ", "የታጠበ አረቢካ", "ያልተሰጠ", "የተሰጠ", "የታሸገ",
+        "በመጓጓዣ ላይ", "የተከፈተ", "ዋጋ የሌለው", "የተጎዳ", "በመጠባበቅ ላይ", "ተቀባይነት ያገኘ", "ውድቅ የተደረገ",
     ),
     AppLanguage.TI to Strings(
         "መርትዖ ቡን", "ካብ መስመር ወጻኢ ድሉው", "ሓፈሻዊ", "ከረጺታት", "ምስግጋር", "ፍሉይ ኩነታት",
@@ -89,5 +108,7 @@ val localizedStrings = mapOf(
         "ዝተፈረመ ሰደድ / ኣእቱ", "ቅድሚ ምእታው ፊርማን ሃሽ ፋይልን ይረጋገጽ።",
         "ዝተፈረመ ጥቕል ፍጠር", "ምእታው ኣረጋግጽ", "ቦታ ግደ / እምነት",
         "መወከሲ ጥራይ · ናይ ምርት ውሕስነት ኣይኮነን", "ቋንቋ ምረጹ",
+        "ኣፍራዪ", "መሳርሒ", "ዝተሓጽበ ኣረቢካ", "ዘይተዋህበ", "ዝተዋህበ", "ዝተዓሸገ",
+        "ኣብ መጓዓዝያ", "ዝተኸፍተ", "ዘይሰርሕ", "ዝተጎድአ", "ኣብ ምጽባይ", "ተቐባልነት ዝረኸበ", "ዝተነጽገ",
     ),
 )

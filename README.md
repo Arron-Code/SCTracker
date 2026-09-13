@@ -45,6 +45,15 @@ boundaries without changing the Expo app. Open
 See `mobile-native\ios\README.md` for architecture, security limitations,
 shared protocol vectors, and the mandatory physical seal-chip proof of concept.
 
+## Native Android reference
+
+An independent Kotlin/Jetpack Compose reference implementation is located in
+`mobile-native\android\`. It demonstrates the same offline evidence protocol,
+lifecycle, transfer, quarantine, signed-package, and guarded NFC boundaries.
+
+See `mobile-native\android\README.md` for build instructions and security
+limitations.
+
 ## Tests
 
 ```powershell
@@ -57,6 +66,11 @@ npm test
 - `docs\SCTracker-Gebrauchsanweisung-DE-EN-AM.pdf`
 - `docs\SCTracker-Cloud-Services-Kaffee-EUDR.pdf`
 - `docs\SCTracker-Mobile-Testcheckliste.pdf`
+- `mobile-native\docs\user-manual-de.md`
+- `mobile-native\docs\user-manual-en.md`
+- `mobile-native\docs\user-manual-am.md`
+- `mobile-native\docs\user-manual-ti.md`
+- `mobile-native\docs\SCTracker-Native-User-Manual-DE-EN-AM-TI.pdf`
 - Editable source documents are stored next to the PDFs.
 
 Rebuild the PDFs with:

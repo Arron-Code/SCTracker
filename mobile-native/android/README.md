@@ -26,6 +26,12 @@ Open `mobile-native\android` directly in Android Studio to run on an Android 8.0
 newer device. NFC hardware is optional; the bundled chip profile remains disabled on every
 device.
 
+Operator manuals are available in
+[`mobile-native\docs`](../docs/): [Deutsch](../docs/user-manual-de.md),
+[English](../docs/user-manual-en.md), [አማርኛ](../docs/user-manual-am.md),
+[ትግርኛ](../docs/user-manual-ti.md), and the
+[combined printable PDF](../docs/SCTracker-Native-User-Manual-DE-EN-AM-TI.pdf).
+
 ## Product and UI scope
 
 - German, English, Amharic, and Tigrinya UI copy.

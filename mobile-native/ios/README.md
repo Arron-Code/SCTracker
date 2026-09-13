@@ -31,6 +31,12 @@ physical device requires Secure Enclave and refuses to fall back to an
 exportable software key. Device builds also reject imported packages or events
 marked as simulator-development signatures.
 
+Operator manuals are available in
+[`mobile-native\docs`](../docs/): [Deutsch](../docs/user-manual-de.md),
+[English](../docs/user-manual-en.md), [አማርኛ](../docs/user-manual-am.md),
+[ትግርኛ](../docs/user-manual-ti.md), and the
+[combined printable PDF](../docs/SCTracker-Native-User-Manual-DE-EN-AM-TI.pdf).
+
 ## Architecture
 
 - `Domain/` defines Actor, Device, Batch, Sack, Seal, Event, Media, Transfer,

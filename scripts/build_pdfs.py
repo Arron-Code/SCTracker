@@ -18,6 +18,7 @@ from reportlab.platypus import (
     Paragraph,
     Spacer,
 )
+from pypdf import PdfReader
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
@@ -241,6 +242,18 @@ def make_document(output: Path, story):
     doc.build(story)
 
 
+def verify_pdf(output: Path, required_text: list[str], minimum_pages: int) -> None:
+    reader = PdfReader(str(output))
+    if len(reader.pages) < minimum_pages:
+        raise RuntimeError(
+            f"{output} has {len(reader.pages)} pages; expected at least {minimum_pages}."
+        )
+    extracted = "\n".join(page.extract_text() or "" for page in reader.pages)
+    missing = [text for text in required_text if text not in extracted]
+    if missing:
+        raise RuntimeError(f"{output} is missing extractable text: {missing}")
+
+
 def cover(style_map, title, subtitle):
     return [
         Spacer(1, 48 * mm),
@@ -312,11 +325,43 @@ def main():
     )
     make_document(DOCS / "SCTracker-Mobile-Testcheckliste.pdf", mobile_test)
 
+    native_docs = ROOT / "mobile-native" / "docs"
+    native_manual_output = native_docs / "SCTracker-Native-User-Manual-DE-EN-AM-TI.pdf"
+    native_manual = cover(
+        style_map,
+        "Native Apps · Benutzerhandbuch · User Manual",
+        "Deutsch · English · አማርኛ · ትግርኛ",
+    )
+    for index, filename in enumerate(
+        [
+            "user-manual-de.md",
+            "user-manual-en.md",
+            "user-manual-am.md",
+            "user-manual-ti.md",
+        ]
+    ):
+        if index:
+            native_manual.append(PageBreak())
+        native_manual.extend(markdown_story(native_docs / filename, style_map))
+    make_document(native_manual_output, native_manual)
+    verify_pdf(
+        native_manual_output,
+        [
+            "Benutzerhandbuch",
+            "User Manual",
+            "የተጠቃሚ መመሪያ",
+            "መምርሒ ተጠቃሚ",
+            "SCT-NFC",
+        ],
+        minimum_pages=16,
+    )
+
     print("Generated:")
     print(" - docs/SCTracker-Analyse-Kaffee-EUDR.pdf")
     print(" - docs/SCTracker-Gebrauchsanweisung-DE-EN-AM.pdf")
     print(" - docs/SCTracker-Cloud-Services-Kaffee-EUDR.pdf")
     print(" - docs/SCTracker-Mobile-Testcheckliste.pdf")
+    print(" - mobile-native/docs/SCTracker-Native-User-Manual-DE-EN-AM-TI.pdf")
 
 
 if __name__ == "__main__":
