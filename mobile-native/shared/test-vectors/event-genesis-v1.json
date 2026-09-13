@@ -1,0 +1,6 @@
+{
+  "canonicalPayload": "{\"state\":\"ISSUED\"}",
+  "payloadHash": "28ec7bccebeef254cf6d88315dd1999f7306d86721e07e021f9cf55a8793771e",
+  "canonicalEnvelope": "{\"actorId\":\"ACT-1\",\"aggregateId\":\"SACK-1\",\"aggregateType\":\"Sack\",\"deviceId\":\"DEV-1\",\"eventId\":\"EV-1\",\"eventType\":\"SACK_ISSUED\",\"occurredAtEpochMillis\":1700000000000,\"payloadHash\":\"28ec7bccebeef254cf6d88315dd1999f7306d86721e07e021f9cf55a8793771e\",\"prevHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"sequence\":1}",
+  "eventHash": "0543ade20a40ec5825515a818d9d112c02a733becfa009ba1fb39671ee2fed49"
+}

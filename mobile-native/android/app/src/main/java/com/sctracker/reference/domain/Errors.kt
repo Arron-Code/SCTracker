@@ -1,0 +1,29 @@
+package com.sctracker.reference.domain
+
+import kotlinx.serialization.Serializable
+
+@Serializable
+enum class ErrorCode {
+    EVENT_SEQUENCE_INVALID,
+    EVENT_PREV_HASH_MISMATCH,
+    EVENT_PAYLOAD_HASH_MISMATCH,
+    EVENT_HASH_MISMATCH,
+    EVENT_ID_COLLISION,
+    TRANSITION_NOT_ALLOWED,
+    GENESIS_SACK_COUNT_INVALID,
+    TRANSFER_OFFER_HASH_MISMATCH,
+    TRANSFER_ALREADY_DECIDED,
+    MANIFEST_SIGNATURE_INVALID,
+    MANIFEST_ENTRY_HASH_MISMATCH,
+    MANIFEST_PATH_INVALID,
+    MANIFEST_DUPLICATE_ENTRY,
+    IMPORT_QUARANTINED,
+    CHIP_PROFILE_UNCONFIGURED,
+    CHIP_READ_BACK_MISMATCH,
+    KEYSTORE_UNAVAILABLE,
+}
+
+class DomainException(
+    val code: ErrorCode,
+    message: String,
+) : IllegalStateException("$code: $message")
