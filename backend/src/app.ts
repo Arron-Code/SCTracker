@@ -3,6 +3,7 @@ import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import { z } from "zod";
 import type { Config } from "./config.js";
+import type { JwtVerifier } from "./auth.js";
 import { actorContext } from "./context.js";
 import { AppError, installErrorHandler } from "./errors.js";
 import { normalizeGeometry } from "./geo.js";
@@ -19,6 +20,7 @@ export interface AppOptions {
   config: Config;
   repository: Repository;
   providers: Providers;
+  authVerifier?: JwtVerifier;
 }
 
 const uuid = z.string().uuid();
@@ -100,13 +102,27 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     openapi: {
       info: { title: "SCTracker API", version: "1.0.0" },
       servers: [{ url: "/" }],
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: "http",
+            scheme: "bearer",
+            bearerFormat: "JWT",
+            description: "Neon Managed Better Auth JWT",
+          },
+        },
+      },
+      security: [{ bearerAuth: [] }],
     },
   });
   await app.register(swaggerUi, { routePrefix: "/docs" });
-  await app.register(actorContext, { config: options.config });
+  await app.register(actorContext, {
+    config: options.config,
+    ...(options.authVerifier ? { verifier: options.authVerifier } : {}),
+  });
   installErrorHandler(app);
 
-  app.get("/health", { schema: { tags: ["system"] } }, async () =>
+  app.get("/health", { schema: { tags: ["system"], security: [] } }, async () =>
     data({ status: "ok", version: process.env.npm_package_version ?? "0.1.0" }),
   );
 

@@ -19,7 +19,22 @@ npm run dev
 
 Development auth is intentionally unavailable unless `DEV_AUTH_ENABLED=true`. Requests then
 require `x-tenant-id` and `x-actor-id`; `x-device-id` is optional. Production startup fails if
-development auth is enabled. Connect a real authentication gateway before production traffic.
+development auth is enabled.
+
+For production, set `NEON_AUTH_BASE_URL` to the Managed Better Auth URL (for this deployment,
+`https://ep-weathered-boat-b1i5bn4m.neonauth.c-5.eu-central-1.aws.neon.tech/sctracker/auth`) and
+leave `DEV_AUTH_ENABLED=false`. API requests require `Authorization: Bearer <token>`. The backend
+caches the remote JWKS from `<NEON_AUTH_BASE_URL>/.well-known/jwks.json` and verifies EdDSA
+signatures, expiry, and the exact issuer and audience origin. Missing configuration returns
+`AUTH_NOT_CONFIGURED`; invalid tokens or claims return `UNAUTHENTICATED`.
+
+Tenant and actor UUIDs are deterministic SHA-256 identifiers. The input is domain-separated as
+`sctracker:neon-auth:v1:organization\0<activeOrganizationId>` or
+`sctracker:neon-auth:v1:subject\0<sub>`, truncated to 128 bits, with RFC 4122 variant and version
+8 bits applied. This keeps organization and subject collision domains distinct and stable while
+remaining compatible with existing UUID columns. Production tenant authorization only uses the
+signed `activeOrganizationId` claim; `x-tenant-id` and `x-actor-id` are ignored. `x-device-id`
+remains optional operational metadata and does not influence authorization.
 
 OpenAPI UI is available at `/docs`; the machine-readable document is `/docs/json`.
 Successful responses use `{ "data": ..., "meta": ... }`; failures use

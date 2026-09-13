@@ -7,6 +7,7 @@ const schema = z.object({
   DATABASE_URL: z.string().min(1),
   LOG_LEVEL: z.string().default("info"),
   DEV_AUTH_ENABLED: z.string().default("false").transform((value) => value === "true"),
+  NEON_AUTH_BASE_URL: z.string().url().optional(),
   WORKER_POLL_MS: z.coerce.number().int().positive().default(2000),
   AWS_REGION: z.string().optional(),
   S3_ENDPOINT: z.string().url().optional(),

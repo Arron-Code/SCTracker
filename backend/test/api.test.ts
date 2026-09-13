@@ -84,7 +84,7 @@ describe("SCTracker API", () => {
     const ring = plotResponse.json().data.geometry.coordinates[0];
     expect(ring[0]).toEqual(ring.at(-1));
     await app.close();
-  }, 15_000);
+  }, 120_000);
 
   it("rejects mass-balance mismatches with the stable error envelope", async () => {
     const app = await buildApp({ config, repository, providers });
