@@ -1057,6 +1057,188 @@ tr:last-child td {
   opacity: 1;
 }
 
+.toast[data-kind="error"] {
+  background: var(--red);
+}
+
+.button-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.resource-list {
+  display: grid;
+  gap: 10px;
+  margin: 24px 0;
+}
+
+.resource-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #faf9f5;
+}
+
+.resource-item strong,
+.resource-item small {
+  display: block;
+}
+
+.resource-item small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.resource-state {
+  padding: 24px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.resource-state.error,
+.form-error {
+  color: var(--red);
+}
+
+.resource-state.loading::after {
+  display: inline-block;
+  width: 0.9em;
+  overflow: hidden;
+  vertical-align: bottom;
+  content: "…";
+  animation: loading 1s steps(2, end) infinite;
+}
+
+@keyframes loading {
+  0% {
+    width: 0;
+  }
+  100% {
+    width: 0.9em;
+  }
+}
+
+.job-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.job-status:empty {
+  display: none;
+}
+
+.workflow-dialog {
+  width: min(580px, calc(100% - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  color: var(--ink);
+  background: var(--panel);
+  box-shadow: 0 24px 80px rgba(20, 37, 29, 0.28);
+}
+
+.workflow-dialog::backdrop {
+  background: rgba(20, 37, 29, 0.64);
+  backdrop-filter: blur(3px);
+}
+
+.dialog-shell {
+  display: grid;
+  gap: 18px;
+  padding: 28px;
+}
+
+.dialog-shell .panel-header {
+  align-items: center;
+  margin-bottom: 0;
+}
+
+.dialog-close {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  color: var(--muted);
+  background: #eeeee9;
+  font-size: 1.3rem;
+}
+
+#dialog-content {
+  display: grid;
+  gap: 15px;
+}
+
+#dialog-content > label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+#dialog-content input {
+  min-height: 44px;
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid #bdc5be;
+  border-radius: 8px;
+  color: var(--ink);
+  background: white;
+}
+
+#dialog-content input:focus {
+  outline: 3px solid rgba(31, 90, 67, 0.18);
+  border-color: var(--forest);
+}
+
+#dialog-content fieldset {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+
+#dialog-content legend {
+  padding: 0 6px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+#dialog-content .radio-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#dialog-content .radio-field input {
+  width: auto;
+  min-height: auto;
+}
+
+.form-error {
+  min-height: 1.2em;
+  font-size: 0.78rem;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 @media (max-width: 1100px) {
   .metric-grid,
   .risk-grid {

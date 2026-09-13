@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "python scripts/serve.py",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "check": "node --check app.js && node --check src/api.mjs && node --check src/domain.mjs && node --check src/geojson.mjs && node --check src/i18n.mjs"
   }
 }

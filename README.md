@@ -1,10 +1,10 @@
 # SCTracker
 
-SCTracker is an early product prototype for coffee-specific EUDR traceability. It demonstrates the operational path from supplier and plot data through quantitative batch lineage, risk review, evidence packaging, and DDS preparation.
+SCTracker is a coffee-specific EUDR traceability web client. It connects supplier and plot data with quantitative batch lineage, risk review, evidence packaging, and DDS preparation.
 
 ## Scope
 
-The current prototype is deliberately limited to coffee:
+The current client is deliberately limited to coffee:
 
 - supplier and producer intake
 - plot and geolocation validation
@@ -22,6 +22,36 @@ npm start
 ```
 
 Open `http://localhost:4173`.
+
+## Web API configuration
+
+By default, the web client calls the same origin under `/api/v1`. Deployments can inject a different base URL before `app.js` loads:
+
+```html
+<script>
+  window.SC_TRACKER_CONFIG = {
+    SC_TRACKER_API_URL: "https://api.example.com/api/v1"
+  };
+</script>
+```
+
+The client expects successful responses as `{ "data": ..., "meta": ... }` and errors as `{ "error": { "code": "...", "message": "...", "details": ... } }`. It integrates:
+
+- `GET` and `POST` `/suppliers`, `/plots`, and `/shipments`
+- presigned document initiation at `POST /documents/uploads`, binary `PUT` to the returned URL, and `POST /documents/:id/complete`
+- analysis creation and status at `POST /analyses` and `GET /analyses/:id`
+- evidence-pack creation and status at `POST /evidence-packs` and `GET /evidence-packs/:id`
+- DDS validation/submission and status at `POST /dds/submissions` and `GET /dds/submissions/:id`
+
+GeoJSON import accepts `Point`, `Polygon`, and `MultiPolygon` geometries, individual Features, or FeatureCollections. Coordinates, closed rings, minimum ring size, and polygon self-intersections are checked before requests are sent.
+
+Mock API behavior is disabled by default. Enable the in-memory mock only for explicit local development:
+
+```html
+<script>
+  window.SC_TRACKER_CONFIG = { mockApi: true };
+</script>
+```
 
 ## Mobile app
 
@@ -66,6 +96,7 @@ operation, and Railway deployment.
 
 ```powershell
 npm test
+npm run check
 ```
 
 ## Documentation

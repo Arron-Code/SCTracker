@@ -23,10 +23,22 @@ test("translation lookup resolves German, English, and Amharic", () => {
 });
 
 test("all translation keys referenced by the web UI exist", async () => {
-  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const [html, javascript] = await Promise.all([
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../app.js", import.meta.url), "utf8"),
+  ]);
   const keyPattern =
     /data-(?:i18n|i18n-aria-label|i18n-content|title-key|toast-key)="([^"]+)"/g;
-  const referencedKeys = [...html.matchAll(keyPattern)].map((match) => match[1]);
+  const referencedKeys = [
+    ...[...html.matchAll(keyPattern)].map((match) => match[1]),
+    ...[...javascript.matchAll(/\bt\("([^"]+)"\)/g)].map((match) => match[1]),
+    ...[...javascript.matchAll(/(?:title|submit|success): "((?:dialog|common|success)\.[^"]+)"/g)].map(
+      (match) => match[1],
+    ),
+    ...[...javascript.matchAll(/\bfield\("[^"]+", "([^"]+)"/g)].map(
+      (match) => match[1],
+    ),
+  ];
 
   assert.ok(referencedKeys.length > 0);
 
