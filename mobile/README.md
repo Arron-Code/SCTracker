@@ -11,12 +11,16 @@ Expo/React-Native-App für Android und iOS mit vollständiger Oberfläche in Deu
 - Dokument-Upload über Presigned-URL-Initiierung und Abschluss
 - Satellitenanalyse, Evidence-Pack-Anforderung mit Download/Teilen sowie DDS-Entwurf, Validierung, Einreichung und Status
 - sichtbarer Online-/Offline-, Konfigurations- und Synchronisierungsstatus mit manueller Wiederholung
+- Neon Managed Better Auth mit E-Mail-Anmeldung und aktiver Organisation
 
-`NOT_CONFIGURED` und eine fehlende API-URL werden immer als blockierende Fehler angezeigt und nie als Erfolg behandelt.
+`NOT_CONFIGURED`, fehlende API-/Auth-URLs und eine fehlende aktive Organisation
+werden immer als blockierende Fehler angezeigt und nie als Erfolg behandelt.
+Offline-Entwürfe und die Outbox bleiben dabei vollständig verfügbar.
 
 ## Konfiguration
 
-`.env.example` nach `.env.local` kopieren und die Backend-Basis-URL setzen:
+`.env.example` nach `.env.local` kopieren und die öffentlichen Backend- und
+Neon-Auth-Basis-URLs setzen:
 
 ```powershell
 Copy-Item .env.example .env.local
@@ -24,11 +28,26 @@ Copy-Item .env.example .env.local
 
 ```dotenv
 EXPO_PUBLIC_API_URL=http://localhost:3000
+EXPO_PUBLIC_NEON_AUTH_URL=https://your-neon-auth-host.example/neondb/auth
 ```
 
-Es ist keine Produktions-URL fest eingebaut. Für ein physisches Gerät muss die URL vom Gerät erreichbar sein; `localhost` verweist dort auf das Gerät selbst.
+Es ist keine Produktions-URL fest eingebaut. Beide URLs sind öffentliche
+Laufzeitkonfiguration, keine Geheimnisse. Neon-API-Schlüssel,
+Datenbank-Zugangsdaten und andere Server-Secrets dürfen nicht in Expo-Variablen
+stehen. Für ein physisches Gerät muss die API-URL vom Gerät erreichbar sein;
+`localhost` verweist dort auf das Gerät selbst.
+
+Die App bietet Anmeldung, Registrierung, Abmeldung und
+Organisationserstellung/-auswahl in Deutsch, Englisch, Amharisch und Tigrinya.
+Das Better-Auth-Expo-Plugin speichert Session-Cookies in `expo-secure-store`.
+Kurzlebige JWTs werden mit `token()` je API-Aufruf neu bezogen und nie in
+AsyncStorage oder localStorage gespeichert.
 
 Die App erwartet JSON-Antworten im Format `{ "data": ..., "meta": ... }` und Fehler als `{ "error": { "code": "...", "message": "...", "details": ... } }`.
+Jeder API-Aufruf sendet `Authorization: Bearer <token>`. Das Backend leitet
+interne UUIDs ausschließlich aus den signierten JWT-Claims `sub` und
+`activeOrganizationId` ab; der Client sendet keine überschreibbaren
+Principal-IDs.
 
 Verwendete Endpunkte:
 

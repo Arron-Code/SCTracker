@@ -23,6 +23,7 @@ import {
 } from "react-native";
 import {
   ApiError,
+  configureApiAuth,
   getApiBaseUrl,
   getOperation,
   requestOperation,
@@ -30,6 +31,18 @@ import {
   uploadDocument,
   validateDds,
 } from "./src/api";
+import {
+  authConfigured,
+  createOrganization,
+  getAccessToken,
+  getSession,
+  listOrganizations,
+  setActiveOrganization,
+  signIn,
+  signOut,
+  signUp,
+} from "./src/auth";
+import type { AuthOrganization, AuthSession } from "./src/auth-core";
 import {
   closePolygon,
   createUuid,
@@ -53,6 +66,8 @@ import { LANGUAGE_STORAGE_KEY, loadState, saveState } from "./src/storage";
 import { synchronize } from "./src/sync";
 
 type Tab = "home" | "suppliers" | "plots" | "operations" | "help";
+
+configureApiAuth(authConfigured ? getAccessToken : null);
 
 const palette = {
   ink: "#14251D",
@@ -116,6 +131,7 @@ function Field({
   multiline = false,
   placeholder,
   keyboardType,
+  secureTextEntry = false,
 }: {
   label: string;
   value: string;
@@ -123,6 +139,7 @@ function Field({
   multiline?: boolean;
   placeholder?: string;
   keyboardType?: "default" | "decimal-pad" | "number-pad";
+  secureTextEntry?: boolean;
 }) {
   return (
     <View>
@@ -134,6 +151,7 @@ function Field({
         placeholderTextColor="#98A29C"
         multiline={multiline}
         keyboardType={keyboardType}
+        secureTextEntry={secureTextEntry}
         autoCapitalize="sentences"
         style={[styles.input, multiline && styles.textArea]}
         accessibilityLabel={label}
@@ -652,6 +670,137 @@ function ConflictCard({
   );
 }
 
+function AuthCard({
+  session,
+  organizations,
+  loading,
+  error,
+  refresh,
+  t,
+}: {
+  session: AuthSession | null;
+  organizations: AuthOrganization[];
+  loading: boolean;
+  error: string | null;
+  refresh: () => Promise<void>;
+  t: Translation;
+}) {
+  const [mode, setMode] = useState<"signIn" | "signUp">("signIn");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [organizationName, setOrganizationName] = useState("");
+  const [organizationSlug, setOrganizationSlug] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  async function run(action: () => Promise<unknown>) {
+    setSubmitting(true);
+    setActionError(null);
+    try {
+      await action();
+      await refresh();
+    } catch (nextError) {
+      setActionError(nextError instanceof Error ? nextError.message : String(nextError));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (!authConfigured) {
+    return (
+      <View style={styles.blocking}>
+        <Ionicons name="warning" size={23} color={palette.red} />
+        <View style={styles.flex}>
+          <Text style={styles.blockingTitle}>{t.auth.notConfigured}</Text>
+          <Text style={styles.description}>{t.auth.notConfiguredDetail}</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (loading) {
+    return <ActivityIndicator size="small" color={palette.forest} />;
+  }
+
+  if (!session) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>{mode === "signIn" ? t.auth.signIn : t.auth.signUp}</Text>
+        {mode === "signUp" ? <Field label={t.common.name} value={name} onChangeText={setName} /> : null}
+        <Field label={t.auth.email} value={email} onChangeText={setEmail} />
+        <Field label={t.auth.password} value={password} onChangeText={setPassword} secureTextEntry />
+        {actionError ?? error ? <Text style={styles.errorText}>{actionError ?? error}</Text> : null}
+        <Button
+          label={mode === "signIn" ? t.auth.signIn : t.auth.signUp}
+          icon={mode === "signIn" ? "log-in" : "person-add"}
+          disabled={submitting}
+          onPress={() => void run(() => mode === "signIn"
+            ? signIn(email.trim(), password)
+            : signUp(name.trim(), email.trim(), password))}
+        />
+        <Button
+          label={mode === "signIn" ? t.auth.needAccount : t.auth.haveAccount}
+          icon="swap-horizontal"
+          secondary
+          disabled={submitting}
+          onPress={() => setMode(mode === "signIn" ? "signUp" : "signIn")}
+        />
+      </View>
+    );
+  }
+
+  const activeOrganizationId = session.session.activeOrganizationId ?? null;
+  return (
+    <View style={styles.card}>
+      <View style={styles.rowBetween}>
+        <View style={styles.flex}>
+          <Text style={styles.cardTitle}>{session.user.name}</Text>
+          <Text style={styles.caption}>{session.user.email}</Text>
+        </View>
+        <Button
+          label={t.auth.signOut}
+          icon="log-out"
+          secondary
+          disabled={submitting}
+          onPress={() => void run(signOut)}
+        />
+      </View>
+      <Text style={styles.label}>{t.auth.organization}</Text>
+      {organizations.map((organization) => (
+        <Pressable
+          key={organization.id}
+          onPress={() => void run(() => setActiveOrganization(organization.id))}
+          disabled={submitting}
+          style={[
+            styles.organization,
+            organization.id === activeOrganizationId && styles.organizationActive,
+          ]}
+          accessibilityRole="radio"
+          accessibilityState={{ checked: organization.id === activeOrganizationId }}
+        >
+          <Text style={styles.itemTitle}>{organization.name}</Text>
+          <Text style={styles.caption}>{organization.slug}</Text>
+        </Pressable>
+      ))}
+      {!activeOrganizationId ? <Text style={styles.errorText}>{t.auth.organizationRequired}</Text> : null}
+      <Field label={t.auth.organizationName} value={organizationName} onChangeText={setOrganizationName} />
+      <Field label={t.auth.organizationSlug} value={organizationSlug} onChangeText={setOrganizationSlug} />
+      {actionError ?? error ? <Text style={styles.errorText}>{actionError ?? error}</Text> : null}
+      <Button
+        label={t.auth.createOrganization}
+        icon="business"
+        disabled={submitting || !organizationName.trim() || !organizationSlug.trim()}
+        onPress={() => void run(async () => {
+          await createOrganization(organizationName.trim(), organizationSlug.trim());
+          setOrganizationName("");
+          setOrganizationSlug("");
+        })}
+      />
+    </View>
+  );
+}
+
 function LanguageChooser({
   visible,
   language,
@@ -705,9 +854,34 @@ export default function App() {
   const [online, setOnline] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [authSession, setAuthSession] = useState<AuthSession | null>(null);
+  const [organizations, setOrganizations] = useState<AuthOrganization[]>([]);
+  const [authLoading, setAuthLoading] = useState(authConfigured);
+  const [authError, setAuthError] = useState<string | null>(null);
   const persistReady = useRef(false);
   const t = translations[language];
   const configured = getApiBaseUrl() !== null;
+  const authorized = Boolean(authSession?.session.activeOrganizationId);
+
+  async function refreshAuth() {
+    if (!authConfigured) {
+      setAuthLoading(false);
+      return;
+    }
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      const nextSession = await getSession();
+      setAuthSession(nextSession);
+      setOrganizations(nextSession ? await listOrganizations() : []);
+    } catch (error) {
+      setAuthSession(null);
+      setOrganizations([]);
+      setAuthError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAuthLoading(false);
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -729,6 +903,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    void refreshAuth();
+  }, []);
+
+  useEffect(() => {
     if (!state || !persistReady.current) return;
     void saveState(state).catch(() => Alert.alert(t.alerts.storageError));
   }, [state, t.alerts.storageError]);
@@ -741,6 +919,10 @@ export default function App() {
     if (!state || syncing) return;
     if (!configured) {
       setSyncError(t.sync.notConfiguredDetail);
+      return;
+    }
+    if (!authorized) {
+      setSyncError(t.auth.organizationRequired);
       return;
     }
     setSyncing(true);
@@ -838,7 +1020,7 @@ export default function App() {
           icon={syncError ? "refresh" : "cloud-upload"}
           onPress={() => void syncNow()}
           secondary
-          disabled={syncing || !online || !configured}
+          disabled={syncing || !online || !configured || !authorized}
         />
       </View>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -851,6 +1033,14 @@ export default function App() {
             </View>
           </View>
         ) : null}
+        <AuthCard
+          session={authSession}
+          organizations={organizations}
+          loading={authLoading}
+          error={authError}
+          refresh={refreshAuth}
+          t={t}
+        />
         {state.conflicts.length > 0 ? (
           <Section title={t.sync.conflicts}>
             {state.conflicts.map((conflict) => (
@@ -961,4 +1151,6 @@ const styles = StyleSheet.create({
   language: { minHeight: 48, justifyContent: "center", paddingHorizontal: 13, borderWidth: 1, borderColor: palette.line, borderRadius: 9 },
   languageActive: { borderColor: palette.forest, backgroundColor: palette.forest },
   languageText: { color: "#FFFFFF" },
+  organization: { padding: 11, borderWidth: 1, borderColor: palette.line, borderRadius: 9, backgroundColor: "#FFFFFF" },
+  organizationActive: { borderColor: palette.forest, backgroundColor: palette.softGreen },
 });

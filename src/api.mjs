@@ -116,13 +116,27 @@ function createMockTransport(store = createMockStore()) {
 export function createApiClient(options = {}) {
   const config = getRuntimeConfig(options.config);
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const tokenProvider = options.tokenProvider;
   const mock = config.mockApi ? createMockTransport(options.mockStore) : null;
 
   async function request(path, init = {}) {
     if (!fetchImpl) {
       throw new ApiError("NETWORK_UNAVAILABLE", "Fetch is not available.");
     }
+    if (!tokenProvider) {
+      throw new ApiError(
+        "AUTH_NOT_CONFIGURED",
+        "Neon Auth token provider is not configured.",
+        undefined,
+        0,
+      );
+    }
+    const token = await tokenProvider();
+    if (!token) {
+      throw new ApiError("AUTH_REQUIRED", "Sign in and select an organization.", undefined, 401);
+    }
     const headers = new Headers(init.headers);
+    headers.set("authorization", `Bearer ${token}`);
     if (init.body && !(init.body instanceof FormData) && !headers.has("content-type")) {
       headers.set("content-type", "application/json");
     }

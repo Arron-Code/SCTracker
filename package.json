@@ -5,7 +5,11 @@
   "type": "module",
   "scripts": {
     "start": "python scripts/serve.py",
+    "build:auth": "npx --yes esbuild@0.25.10 node_modules/@neondatabase/auth/dist/index.mjs --bundle --format=esm --platform=browser --target=es2022 --minify --outfile=vendor/neon-auth.mjs",
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check app.js && node --check src/api.mjs && node --check src/domain.mjs && node --check src/geojson.mjs && node --check src/i18n.mjs"
+    "check": "node --check app.js && node --check src/api.mjs && node --check src/auth.mjs && node --check src/domain.mjs && node --check src/geojson.mjs && node --check src/i18n.mjs"
+  },
+  "dependencies": {
+    "@neondatabase/auth": "0.5.0-beta"
   }
 }

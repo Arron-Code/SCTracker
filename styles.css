@@ -280,14 +280,18 @@ h3 {
   font-size: 0.86rem;
 }
 
-.avatar {
-  width: 42px;
-  height: 42px;
+.auth-button {
+  min-height: 42px;
+  max-width: 180px;
+  overflow: hidden;
+  padding: 0 14px;
   border: 0;
-  border-radius: 50%;
+  border-radius: 21px;
   color: white;
   background: var(--coffee);
   font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .view {
@@ -1188,6 +1192,35 @@ tr:last-child td {
 }
 
 #dialog-content input {
+  min-height: 44px;
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid #bdc5be;
+  border-radius: 8px;
+  color: var(--ink);
+  background: white;
+}
+
+.auth-form {
+  display: grid;
+  gap: 14px;
+}
+
+.auth-form.nested {
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.auth-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.auth-form input,
+.auth-form select {
   min-height: 44px;
   width: 100%;
   padding: 9px 11px;
