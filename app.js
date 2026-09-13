@@ -1,10 +1,13 @@
+import { createApiClient, ApiError } from "./src/api.mjs?v=2";
 import { calculateCompletion, validateMassBalance } from "./src/domain.mjs?v=1";
+import { parseGeoJson } from "./src/geojson.mjs?v=2";
 import {
   SUPPORTED_LANGUAGES,
   applyTranslations,
   translate,
-} from "./src/i18n.mjs?v=1";
+} from "./src/i18n.mjs?v=2";
 
+const api = createApiClient();
 const completion = calculateCompletion({
   supplier: true,
   plots: true,
@@ -16,142 +19,216 @@ const completion = calculateCompletion({
   approval: false,
   product: true,
 });
-
 const balance = validateMassBalance(
   [{ quantityKg: 19240 }],
   [{ quantityKg: 18500 }, { quantityKg: 740 }],
 );
 
+const state = {
+  suppliers: [],
+  plots: [],
+  shipments: [],
+  errors: {
+    suppliers: null,
+    plots: null,
+    shipments: null,
+  },
+};
 const views = [...document.querySelectorAll(".view")];
 const navLinks = [...document.querySelectorAll(".nav-link")];
 const pageTitle = document.querySelector("#page-title");
 const toast = document.querySelector("#toast");
+const dialog = document.querySelector("#workflow-dialog");
+const dialogTitle = document.querySelector("#dialog-title");
+const dialogContent = document.querySelector("#dialog-content");
+const dialogError = document.querySelector("#dialog-error");
+const dialogSubmit = document.querySelector("#dialog-submit");
 const languageButtons = [...document.querySelectorAll("[data-language]")];
-let toastTimer;
+let activeDialog;
 let activeLanguage = getInitialLanguage();
+let toastTimer;
+
+function t(key) {
+  return translate(activeLanguage, key);
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
 
 function getInitialLanguage() {
   const stored = localStorage.getItem("sctracker.language");
-  if (SUPPORTED_LANGUAGES.includes(stored)) {
-    return stored;
-  }
-
+  if (SUPPORTED_LANGUAGES.includes(stored)) return stored;
   const browserLanguage = navigator.language.toLowerCase();
-  if (browserLanguage.startsWith("am")) {
-    return "am";
-  }
-  if (browserLanguage.startsWith("en")) {
-    return "en";
-  }
+  if (browserLanguage.startsWith("am")) return "am";
+  if (browserLanguage.startsWith("en")) return "en";
   return "de";
 }
 
-function renderDynamicContent() {
-  const t = (key) => translate(activeLanguage, key);
-  const lineage = [
-    {
-      type: t("lineage.sourceLots"),
-      title: "SL-041 · SL-044 · SL-052",
-      detail: t("lineage.rawCoffee"),
-    },
-    {
-      type: t("lineage.processing"),
-      title: "Dry Mill DM-2026-88",
-      detail: t("lineage.loss"),
-    },
-    {
-      type: t("lineage.exportBatch"),
-      title: "B-2026-091",
-      detail: t("lineage.released"),
-    },
-    {
-      type: t("lineage.shipment"),
-      title: "IMP-2026-0142",
-      detail: t("lineage.allocated"),
-    },
-  ];
+function showToast(message, kind = "success") {
+  toast.textContent = message;
+  toast.dataset.kind = kind;
+  toast.classList.add("visible");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("visible"), 3600);
+}
 
-  const riskSignals = [
-    {
-      label: t("signal.completeness"),
-      score: "82%",
-      detail: t("signal.missingEvidence"),
-      warning: true,
-    },
-    {
-      label: t("signal.geoQuality"),
-      score: "94%",
-      detail: t("signal.openPolygon"),
-      warning: false,
-    },
-    {
-      label: t("signal.deforestation"),
-      score: t("signal.low"),
-      detail: t("signal.eoAnalysis"),
-      warning: false,
-    },
-    {
-      label: t("signal.legality"),
-      score: t("signal.review"),
-      detail: t("signal.documentExpires"),
-      warning: true,
-    },
-    {
-      label: t("signal.traceability"),
-      score: "99%",
-      detail: t("signal.quantityCase"),
-      warning: true,
-    },
-  ];
-
-  document.querySelector("#completion-score").textContent = `${completion}%`;
-  document.querySelector("#lineage").innerHTML = lineage
-    .map(
-      (node) => `
-        <div class="lineage-node">
-          <small>${node.type}</small>
-          <strong>${node.title}</strong>
-          <em>${node.detail}</em>
-        </div>
-      `,
-    )
-    .join("");
-
-  document.querySelector("#risk-grid").innerHTML = riskSignals
-    .map(
-      (signal) => `
-        <article class="risk-card ${signal.warning ? "warning" : ""}">
-          <small>${signal.label}</small>
-          <strong>${signal.score}</strong>
-          <small>${signal.detail}</small>
-        </article>
-      `,
-    )
-    .join("");
+function errorMessage(error) {
+  if (error instanceof ApiError && error.code === "NOT_CONFIGURED") {
+    return t("error.notConfigured");
+  }
+  if (error instanceof ApiError && error.code === "NETWORK_UNAVAILABLE") {
+    return t("error.network");
+  }
+  if (error instanceof ApiError && ["HTTP_ERROR", "INVALID_RESPONSE"].includes(error.code)) {
+    return t("error.generic");
+  }
+  return error?.message || t("error.generic");
 }
 
 function showView(viewId) {
   const selected = views.find((view) => view.id === viewId) ?? views[0];
-
   views.forEach((view) => view.classList.toggle("active", view === selected));
-  navLinks.forEach((link) => {
-    link.classList.toggle("active", link.dataset.view === selected.id);
+  navLinks.forEach((link) => link.classList.toggle("active", link.dataset.view === selected.id));
+  pageTitle.textContent = t(selected.dataset.titleKey);
+}
+
+function renderDynamicContent() {
+  const lineage = [
+    { type: t("lineage.sourceLots"), title: "SL-041 · SL-044 · SL-052", detail: t("lineage.rawCoffee") },
+    { type: t("lineage.processing"), title: "Dry Mill DM-2026-88", detail: t("lineage.loss") },
+    { type: t("lineage.exportBatch"), title: "B-2026-091", detail: t("lineage.released") },
+    { type: t("lineage.shipment"), title: "IMP-2026-0142", detail: t("lineage.allocated") },
+  ];
+  const riskSignals = [
+    { label: t("signal.completeness"), score: "82%", detail: t("signal.missingEvidence"), warning: true },
+    { label: t("signal.geoQuality"), score: "94%", detail: t("signal.openPolygon") },
+    { label: t("signal.deforestation"), score: t("signal.low"), detail: t("signal.eoAnalysis") },
+    { label: t("signal.legality"), score: t("signal.review"), detail: t("signal.documentExpires"), warning: true },
+    { label: t("signal.traceability"), score: "99%", detail: t("signal.quantityCase"), warning: true },
+  ];
+
+  document.querySelector("#completion-score").textContent = `${completion}%`;
+  document.querySelector("#lineage").innerHTML = lineage.map((node) => `
+    <div class="lineage-node">
+      <small>${escapeHtml(node.type)}</small>
+      <strong>${escapeHtml(node.title)}</strong>
+      <em>${escapeHtml(node.detail)}</em>
+    </div>`).join("");
+  document.querySelector("#risk-grid").innerHTML = riskSignals.map((signal) => `
+    <article class="risk-card ${signal.warning ? "warning" : ""}">
+      <small>${escapeHtml(signal.label)}</small>
+      <strong>${escapeHtml(signal.score)}</strong>
+      <small>${escapeHtml(signal.detail)}</small>
+    </article>`).join("");
+}
+
+function resourceState(target, key, kind = "loading") {
+  target.innerHTML = `<div class="resource-state ${kind}">${escapeHtml(t(key))}</div>`;
+}
+
+function renderSuppliers() {
+  const target = document.querySelector("#supplier-rows");
+  if (state.errors.suppliers) {
+    target.innerHTML = `<tr><td colspan="6"><div class="resource-state error">${escapeHtml(errorMessage(state.errors.suppliers))}</div></td></tr>`;
+    return;
+  }
+  if (state.suppliers.length === 0) {
+    target.innerHTML = `<tr><td colspan="6"><div class="resource-state">${escapeHtml(t("supplier.empty"))}</div></td></tr>`;
+    return;
+  }
+  target.innerHTML = state.suppliers.map((supplier) => `
+    <tr>
+      <td><strong>${escapeHtml(supplier.name)}</strong><small>${escapeHtml(supplier.id)}</small></td>
+      <td>${escapeHtml(supplier.countryCode ?? supplier.country ?? "—")}</td>
+      <td>${escapeHtml(supplier.producerCount ?? "—")}</td>
+      <td>${escapeHtml(supplier.plotCount ?? "—")}</td>
+      <td><span class="badge neutral">${escapeHtml(supplier.status ?? t("status.created"))}</span></td>
+      <td>${escapeHtml(supplier.updatedAt ?? supplier.createdAt ?? "—")}</td>
+    </tr>`).join("");
+}
+
+function renderPlots() {
+  const target = document.querySelector("#plot-list");
+  if (state.errors.plots) {
+    target.innerHTML = `<div class="resource-state error">${escapeHtml(errorMessage(state.errors.plots))}</div>`;
+    return;
+  }
+  if (state.plots.length === 0) {
+    resourceState(target, "plot.empty");
+    return;
+  }
+  target.innerHTML = state.plots.map((plot) => `
+    <article class="resource-item">
+      <div><strong>${escapeHtml(plot.name ?? plot.reference ?? plot.id)}</strong>
+      <small>${escapeHtml(plot.id)} · ${escapeHtml(plot.geometry?.type ?? plot.geojson?.geometry?.type ?? "—")}</small></div>
+      <span class="badge neutral">${escapeHtml(plot.status ?? t("status.created"))}</span>
+    </article>`).join("");
+}
+
+function renderShipments() {
+  const target = document.querySelector("#shipment-rows");
+  if (state.errors.shipments) {
+    target.innerHTML = `<tr><td colspan="6"><div class="resource-state error">${escapeHtml(errorMessage(state.errors.shipments))}</div></td></tr>`;
+    return;
+  }
+  if (state.shipments.length === 0) {
+    target.innerHTML = `<tr><td colspan="6"><div class="resource-state">${escapeHtml(t("shipment.empty"))}</div></td></tr>`;
+    return;
+  }
+  target.innerHTML = state.shipments.map((shipment) => `
+    <tr>
+      <td><strong>${escapeHtml(shipment.reference ?? shipment.id)}</strong><small>${escapeHtml(shipment.id)}</small></td>
+      <td>${escapeHtml(shipment.productName ?? shipment.productCode ?? "—")}</td>
+      <td>${escapeHtml(shipment.quantityKg ?? "—")} kg</td>
+      <td>${escapeHtml(shipment.originCountryCode ?? shipment.origin ?? "—")}</td>
+      <td><span class="badge neutral">${escapeHtml(shipment.balanceStatus ?? "—")}</span></td>
+      <td><span class="badge neutral">${escapeHtml(shipment.status ?? t("status.created"))}</span></td>
+    </tr>`).join("");
+}
+
+async function loadResources() {
+  const supplierTarget = document.querySelector("#supplier-rows");
+  const shipmentTarget = document.querySelector("#shipment-rows");
+  supplierTarget.innerHTML = `<tr><td colspan="6"><div class="resource-state loading">${escapeHtml(t("common.loading"))}</div></td></tr>`;
+  shipmentTarget.innerHTML = `<tr><td colspan="6"><div class="resource-state loading">${escapeHtml(t("common.loading"))}</div></td></tr>`;
+  resourceState(document.querySelector("#plot-list"), "common.loading", "loading");
+
+  const results = await Promise.allSettled([
+    api.suppliers.list(),
+    api.plots.list(),
+    api.shipments.list(),
+  ]);
+  const renderers = [renderSuppliers, renderPlots, renderShipments];
+  const keys = ["suppliers", "plots", "shipments"];
+
+  results.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      state[keys[index]] = Array.isArray(result.value.data) ? result.value.data : [];
+      state.errors[keys[index]] = null;
+    } else {
+      state.errors[keys[index]] = result.reason;
+    }
+    renderers[index]();
   });
-  pageTitle.textContent = translate(activeLanguage, selected.dataset.titleKey);
 }
 
 function setLanguage(language) {
-  if (!SUPPORTED_LANGUAGES.includes(language)) {
-    return;
-  }
-
+  if (!SUPPORTED_LANGUAGES.includes(language)) return;
   activeLanguage = language;
   localStorage.setItem("sctracker.language", language);
   document.documentElement.lang = language;
   applyTranslations(document, language);
   renderDynamicContent();
+  renderSuppliers();
+  renderPlots();
+  renderShipments();
   showView(location.hash.slice(1) || "overview");
-
   languageButtons.forEach((button) => {
     const isActive = button.dataset.language === language;
     button.classList.toggle("active", isActive);
@@ -159,30 +236,226 @@ function setLanguage(language) {
   });
 }
 
-navLinks.forEach((link) => {
-  link.addEventListener("click", (event) => {
-    event.preventDefault();
-    const viewId = link.dataset.view;
-    history.replaceState(null, "", `#${viewId}`);
-    showView(viewId);
-  });
-});
-
-languageButtons.forEach((button) => {
-  button.addEventListener("click", () => setLanguage(button.dataset.language));
-});
-
-document.querySelectorAll("[data-toast-key]").forEach((button) => {
-  button.addEventListener("click", () => {
-    toast.textContent = translate(activeLanguage, button.dataset.toastKey);
-    toast.classList.add("visible");
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toast.classList.remove("visible"), 2600);
-  });
-});
-
-if (!balance.balanced) {
-  console.warn("Demo shipment mass balance is not balanced", balance);
+function field(name, labelKey, options = {}) {
+  const type = options.type ?? "text";
+  const attributes = [
+    `name="${name}"`,
+    `type="${type}"`,
+    options.required === false ? "" : "required",
+    options.accept ? `accept="${options.accept}"` : "",
+    options.min !== undefined ? `min="${options.min}"` : "",
+    options.step ? `step="${options.step}"` : "",
+  ].filter(Boolean).join(" ");
+  return `<label><span>${escapeHtml(t(labelKey))}</span><input ${attributes}></label>`;
 }
 
+const dialogDefinitions = {
+  supplier: {
+    title: "dialog.supplier",
+    submit: "common.create",
+    content: () => [
+      field("name", "form.name"),
+      field("countryCode", "form.countryCode"),
+      field("contactEmail", "form.email", { type: "email" }),
+    ].join(""),
+    execute: (form) => api.suppliers.create({
+      name: form.get("name").trim(),
+      countryCode: form.get("countryCode").trim().toUpperCase(),
+      contactEmail: form.get("contactEmail").trim(),
+    }),
+    success: "success.supplier",
+    refresh: loadResources,
+  },
+  plot: {
+    title: "dialog.plot",
+    submit: "common.import",
+    content: () => [
+      field("supplierId", "form.supplierId"),
+      field("file", "form.geojsonFile", { type: "file", accept: ".json,.geojson,application/geo+json,application/json" }),
+    ].join(""),
+    execute: async (form) => {
+      const file = form.get("file");
+      const features = parseGeoJson(await file.text());
+      const supplierId = form.get("supplierId").trim();
+      const created = [];
+      for (const [index, feature] of features.entries()) {
+        const response = await api.plots.create({
+          supplierId,
+          name: feature.properties.name ?? file.name.replace(/\.(geo)?json$/i, "") + ` ${index + 1}`,
+          geometry: feature.geometry,
+          properties: feature.properties,
+        });
+        created.push(response.data);
+      }
+      return { data: created };
+    },
+    success: "success.plots",
+    refresh: loadResources,
+  },
+  shipment: {
+    title: "dialog.shipment",
+    submit: "common.create",
+    content: () => [
+      field("reference", "form.reference"),
+      field("supplierId", "form.supplierId"),
+      field("productCode", "form.productCode"),
+      field("quantityKg", "form.quantityKg", { type: "number", min: 0, step: "0.001" }),
+      field("originCountryCode", "form.originCountryCode"),
+    ].join(""),
+    execute: (form) => api.shipments.create({
+      reference: form.get("reference").trim(),
+      supplierId: form.get("supplierId").trim(),
+      productCode: form.get("productCode").trim(),
+      quantityKg: Number(form.get("quantityKg")),
+      originCountryCode: form.get("originCountryCode").trim().toUpperCase(),
+    }),
+    success: "success.shipment",
+    refresh: loadResources,
+  },
+  document: {
+    title: "dialog.document",
+    submit: "common.upload",
+    content: () => [
+      field("shipmentId", "form.shipmentId"),
+      field("category", "form.documentCategory"),
+      field("file", "form.documentFile", { type: "file" }),
+    ].join(""),
+    execute: (form) => api.documents.upload(form.get("file"), {
+      shipmentId: form.get("shipmentId").trim(),
+      category: form.get("category").trim(),
+    }),
+    success: "success.document",
+  },
+  analysis: {
+    title: "dialog.analysis",
+    submit: "common.request",
+    content: () => field("plotId", "form.plotId"),
+    execute: async (form) => {
+      const created = await api.analyses.create({ plotId: form.get("plotId").trim() });
+      const result = await pollJob(api.analyses.get, created.data);
+      renderJobStatus(document.querySelector("#analysis-status"), result.data);
+      return result;
+    },
+    success: "success.analysis",
+  },
+  evidence: {
+    title: "dialog.evidence",
+    submit: "common.request",
+    content: () => field("shipmentId", "form.shipmentId"),
+    execute: async (form) => {
+      const created = await api.evidencePacks.create({ shipmentId: form.get("shipmentId").trim() });
+      const result = await pollJob(api.evidencePacks.get, created.data);
+      renderJobStatus(document.querySelector("#evidence-status"), result.data);
+      return result;
+    },
+    success: "success.evidence",
+  },
+  dds: {
+    title: "dialog.dds",
+    submit: "common.continue",
+    content: () => `
+      ${field("shipmentId", "form.shipmentId")}
+      <fieldset>
+        <legend>${escapeHtml(t("form.ddsAction"))}</legend>
+        <label class="radio-field"><input type="radio" name="action" value="validate" checked> <span>${escapeHtml(t("form.validateOnly"))}</span></label>
+        <label class="radio-field"><input type="radio" name="action" value="submit"> <span>${escapeHtml(t("form.submitDds"))}</span></label>
+      </fieldset>`,
+    execute: async (form) => {
+      const created = await api.dds.create({
+        shipmentId: form.get("shipmentId").trim(),
+        action: form.get("action"),
+      });
+      const result = await pollJob(api.dds.get, created.data);
+      renderJobStatus(document.querySelector("#dds-status"), result.data);
+      return result;
+    },
+    success: "success.dds",
+  },
+};
+
+async function pollJob(getJob, initial) {
+  if (["failed", "rejected"].includes(initial?.status)) {
+    throw new ApiError(
+      initial.error?.code ?? "JOB_FAILED",
+      initial.error?.message ?? t("error.jobFailed"),
+      initial.error?.details,
+    );
+  }
+  if (!initial?.id || initial.status === "completed") {
+    return { data: initial };
+  }
+  let current = initial;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const response = await getJob(initial.id);
+    current = response.data;
+    if (["failed", "rejected"].includes(current.status)) {
+      throw new ApiError(
+        current.error?.code ?? "JOB_FAILED",
+        current.error?.message ?? t("error.jobFailed"),
+        current.error?.details,
+      );
+    }
+    if (current.status === "completed") return response;
+  }
+  return { data: current };
+}
+
+function renderJobStatus(target, job) {
+  if (!job) return;
+  const download = job.downloadUrl
+    ? `<a class="secondary-button" href="${escapeHtml(job.downloadUrl)}" target="_blank" rel="noopener">${escapeHtml(t("common.download"))}</a>`
+    : "";
+  target.innerHTML = `<strong>${escapeHtml(t("common.status"))}: ${escapeHtml(job.status ?? "—")}</strong>${download}`;
+}
+
+function openDialog(name) {
+  activeDialog = dialogDefinitions[name];
+  if (!activeDialog) return;
+  dialogTitle.textContent = t(activeDialog.title);
+  dialogContent.innerHTML = activeDialog.content();
+  dialogError.textContent = "";
+  dialogSubmit.textContent = t(activeDialog.submit);
+  dialogSubmit.disabled = false;
+  dialog.showModal();
+  dialogContent.querySelector("input")?.focus();
+}
+
+async function submitDialog(event) {
+  if (event.submitter !== dialogSubmit || !activeDialog) return;
+  event.preventDefault();
+  const formElement = event.currentTarget;
+  if (!formElement.reportValidity()) return;
+  dialogError.textContent = "";
+  dialogSubmit.disabled = true;
+  dialogSubmit.textContent = t("common.saving");
+  try {
+    await activeDialog.execute(new FormData(formElement));
+    dialog.close();
+    showToast(t(activeDialog.success));
+    await activeDialog.refresh?.();
+  } catch (error) {
+    dialogError.textContent = errorMessage(error);
+    dialogSubmit.disabled = false;
+    dialogSubmit.textContent = t(activeDialog.submit);
+  }
+}
+
+navLinks.forEach((link) => link.addEventListener("click", (event) => {
+  event.preventDefault();
+  history.replaceState(null, "", `#${link.dataset.view}`);
+  showView(link.dataset.view);
+}));
+languageButtons.forEach((button) => button.addEventListener("click", () => setLanguage(button.dataset.language)));
+document.querySelectorAll("[data-dialog]").forEach((button) =>
+  button.addEventListener("click", () => openDialog(button.dataset.dialog)),
+);
+dialog.querySelector("form").addEventListener("submit", submitDialog);
+dialog.addEventListener("close", () => {
+  dialog.querySelector("form").reset();
+  activeDialog = null;
+});
+
+if (!balance.balanced) console.warn("Shipment mass balance is not balanced", balance);
 setLanguage(activeLanguage);
+loadResources();
