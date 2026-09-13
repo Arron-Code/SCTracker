@@ -1,0 +1,359 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A00000000000000000000001 /* SCTrackerNativeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000001 /* SCTrackerNativeApp.swift */; };
+		A00000000000000000000002 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000002 /* Models.swift */; };
+		A00000000000000000000003 /* CanonicalJSON.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000003 /* CanonicalJSON.swift */; };
+		A00000000000000000000004 /* StateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000004 /* StateMachine.swift */; };
+		A00000000000000000000005 /* EventLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000005 /* EventLedger.swift */; };
+		A00000000000000000000006 /* Signing.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000006 /* Signing.swift */; };
+		A00000000000000000000007 /* NFCAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000007 /* NFCAdapter.swift */; };
+		A00000000000000000000008 /* PackageTransfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000008 /* PackageTransfer.swift */; };
+		A00000000000000000000009 /* OfflineRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000009 /* OfflineRepository.swift */; };
+		A0000000000000000000000A /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000A /* Localization.swift */; };
+		A0000000000000000000000B /* AppViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000B /* AppViews.swift */; };
+		A0000000000000000000000C /* DomainTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000C /* DomainTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		C00000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D00000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E00000000000000000000001;
+			remoteInfo = SCTrackerNative;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		B00000000000000000000001 /* SCTrackerNativeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SCTrackerNativeApp.swift; sourceTree = "<group>"; };
+		B00000000000000000000002 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		B00000000000000000000003 /* CanonicalJSON.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanonicalJSON.swift; sourceTree = "<group>"; };
+		B00000000000000000000004 /* StateMachine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateMachine.swift; sourceTree = "<group>"; };
+		B00000000000000000000005 /* EventLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventLedger.swift; sourceTree = "<group>"; };
+		B00000000000000000000006 /* Signing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Signing.swift; sourceTree = "<group>"; };
+		B00000000000000000000007 /* NFCAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NFCAdapter.swift; sourceTree = "<group>"; };
+		B00000000000000000000008 /* PackageTransfer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PackageTransfer.swift; sourceTree = "<group>"; };
+		B00000000000000000000009 /* OfflineRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineRepository.swift; sourceTree = "<group>"; };
+		B0000000000000000000000A /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
+		B0000000000000000000000B /* AppViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViews.swift; sourceTree = "<group>"; };
+		B0000000000000000000000C /* DomainTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DomainTests.swift; sourceTree = "<group>"; };
+		B0000000000000000000000D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B0000000000000000000000E /* SCTrackerNative.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SCTrackerNative.entitlements; sourceTree = "<group>"; };
+		B0000000000000000000000F /* SCTrackerNative.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SCTrackerNative.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B00000000000000000000010 /* SCTrackerNativeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SCTrackerNativeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		F00000000000000000000001 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		F00000000000000000000002 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		G00000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				G00000000000000000000002 /* SCTrackerNative */,
+				G00000000000000000000007 /* SCTrackerNativeTests */,
+				G00000000000000000000008 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		G00000000000000000000002 /* SCTrackerNative */ = {
+			isa = PBXGroup;
+			children = (
+				G00000000000000000000003 /* App */,
+				G00000000000000000000004 /* Domain */,
+				G00000000000000000000005 /* Infrastructure */,
+				G00000000000000000000006 /* Features */,
+				G00000000000000000000009 /* Configuration */,
+			);
+			path = SCTrackerNative;
+			sourceTree = "<group>";
+		};
+		G00000000000000000000003 /* App */ = {
+			isa = PBXGroup;
+			children = (B00000000000000000000001 /* SCTrackerNativeApp.swift */,);
+			path = App;
+			sourceTree = "<group>";
+		};
+		G00000000000000000000004 /* Domain */ = {
+			isa = PBXGroup;
+			children = (
+				B00000000000000000000002 /* Models.swift */,
+				B00000000000000000000003 /* CanonicalJSON.swift */,
+				B00000000000000000000004 /* StateMachine.swift */,
+				B00000000000000000000005 /* EventLedger.swift */,
+			);
+			path = Domain;
+			sourceTree = "<group>";
+		};
+		G00000000000000000000005 /* Infrastructure */ = {
+			isa = PBXGroup;
+			children = (
+				B00000000000000000000006 /* Signing.swift */,
+				B00000000000000000000007 /* NFCAdapter.swift */,
+				B00000000000000000000008 /* PackageTransfer.swift */,
+				B00000000000000000000009 /* OfflineRepository.swift */,
+			);
+			path = Infrastructure;
+			sourceTree = "<group>";
+		};
+		G00000000000000000000006 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				B0000000000000000000000A /* Localization.swift */,
+				B0000000000000000000000B /* AppViews.swift */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		G00000000000000000000007 /* SCTrackerNativeTests */ = {
+			isa = PBXGroup;
+			children = (B0000000000000000000000C /* DomainTests.swift */,);
+			path = SCTrackerNativeTests;
+			sourceTree = "<group>";
+		};
+		G00000000000000000000008 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B0000000000000000000000F /* SCTrackerNative.app */,
+				B00000000000000000000010 /* SCTrackerNativeTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		G00000000000000000000009 /* Configuration */ = {
+			isa = PBXGroup;
+			children = (
+				B0000000000000000000000D /* Info.plist */,
+				B0000000000000000000000E /* SCTrackerNative.entitlements */,
+			);
+			path = Configuration;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		E00000000000000000000001 /* SCTrackerNative */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = H00000000000000000000002 /* Build configuration list for PBXNativeTarget "SCTrackerNative" */;
+			buildPhases = (
+				I00000000000000000000001 /* Sources */,
+				F00000000000000000000001 /* Frameworks */,
+				J00000000000000000000001 /* Resources */,
+			);
+			buildRules = ();
+			dependencies = ();
+			name = SCTrackerNative;
+			productName = SCTrackerNative;
+			productReference = B0000000000000000000000F /* SCTrackerNative.app */;
+			productType = "com.apple.product-type.application";
+		};
+		E00000000000000000000002 /* SCTrackerNativeTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = H00000000000000000000003 /* Build configuration list for PBXNativeTarget "SCTrackerNativeTests" */;
+			buildPhases = (
+				I00000000000000000000002 /* Sources */,
+				F00000000000000000000002 /* Frameworks */,
+				J00000000000000000000002 /* Resources */,
+			);
+			buildRules = ();
+			dependencies = (K00000000000000000000001 /* PBXTargetDependency */,);
+			name = SCTrackerNativeTests;
+			productName = SCTrackerNativeTests;
+			productReference = B00000000000000000000010 /* SCTrackerNativeTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		D00000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					E00000000000000000000001 = {CreatedOnToolsVersion = 16.0;};
+					E00000000000000000000002 = {CreatedOnToolsVersion = 16.0; TestTargetID = E00000000000000000000001;};
+				};
+			};
+			buildConfigurationList = H00000000000000000000001 /* Build configuration list for PBXProject "SCTrackerNative" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base,);
+			mainGroup = G00000000000000000000001;
+			productRefGroup = G00000000000000000000008 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				E00000000000000000000001 /* SCTrackerNative */,
+				E00000000000000000000002 /* SCTrackerNativeTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		J00000000000000000000001 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		J00000000000000000000002 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		I00000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00000000000000000000001 /* SCTrackerNativeApp.swift in Sources */,
+				A00000000000000000000002 /* Models.swift in Sources */,
+				A00000000000000000000003 /* CanonicalJSON.swift in Sources */,
+				A00000000000000000000004 /* StateMachine.swift in Sources */,
+				A00000000000000000000005 /* EventLedger.swift in Sources */,
+				A00000000000000000000006 /* Signing.swift in Sources */,
+				A00000000000000000000007 /* NFCAdapter.swift in Sources */,
+				A00000000000000000000008 /* PackageTransfer.swift in Sources */,
+				A00000000000000000000009 /* OfflineRepository.swift in Sources */,
+				A0000000000000000000000A /* Localization.swift in Sources */,
+				A0000000000000000000000B /* AppViews.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		I00000000000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (A0000000000000000000000C /* DomainTests.swift in Sources */,);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		K00000000000000000000001 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = E00000000000000000000001 /* SCTrackerNative */; targetProxy = C00000000000000000000001 /* PBXContainerItemProxy */; };
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		L00000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		L00000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		L00000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = SCTrackerNative/Configuration/SCTrackerNative.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SCTrackerNative/Configuration/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.sctracker.reference.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		L00000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = SCTrackerNative/Configuration/SCTrackerNative.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SCTrackerNative/Configuration/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.sctracker.reference.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		L00000000000000000000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = org.sctracker.reference.ios.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SCTrackerNative.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SCTrackerNative";
+			};
+			name = Debug;
+		};
+		L00000000000000000000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = org.sctracker.reference.ios.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SCTrackerNative.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SCTrackerNative";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		H00000000000000000000001 /* Build configuration list for PBXProject "SCTrackerNative" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (L00000000000000000000001 /* Debug */, L00000000000000000000002 /* Release */,);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		H00000000000000000000002 /* Build configuration list for PBXNativeTarget "SCTrackerNative" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (L00000000000000000000003 /* Debug */, L00000000000000000000004 /* Release */,);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		H00000000000000000000003 /* Build configuration list for PBXNativeTarget "SCTrackerNativeTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (L00000000000000000000005 /* Debug */, L00000000000000000000006 /* Release */,);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = D00000000000000000000001 /* Project object */;
+}

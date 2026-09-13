@@ -34,6 +34,17 @@ npm start
 
 See `mobile\README.md` for Android, iOS, and EAS build instructions.
 
+## Native iOS reference
+
+An independent SwiftUI reference implementation is located in
+`mobile-native\ios\`. It demonstrates offline batch, sack, seal, transfer,
+signed event-chain, verified package import/export, and guarded Core NFC
+boundaries without changing the Expo app. Open
+`mobile-native\ios\SCTrackerNative.xcodeproj` in Xcode 16 or newer.
+
+See `mobile-native\ios\README.md` for architecture, security limitations,
+shared protocol vectors, and the mandatory physical seal-chip proof of concept.
+
 ## Tests
 
 ```powershell
