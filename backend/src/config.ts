@@ -8,6 +8,16 @@ const schema = z.object({
   LOG_LEVEL: z.string().default("info"),
   DEV_AUTH_ENABLED: z.string().default("false").transform((value) => value === "true"),
   NEON_AUTH_BASE_URL: z.string().url().optional(),
+  AUTH_PROVIDERS: z
+    .string()
+    .default("google")
+    .transform((value) => value.split(",").map((provider) => provider.trim()).filter(Boolean))
+    .pipe(z.array(z.string().regex(/^[a-z0-9-]+$/)).min(1)),
+  FRONTEND_ORIGINS: z
+    .string()
+    .default("http://localhost:4173,http://127.0.0.1:4173")
+    .transform((value) => value.split(",").map((origin) => origin.trim()).filter(Boolean))
+    .pipe(z.array(z.string().url())),
   WORKER_POLL_MS: z.coerce.number().int().positive().default(2000),
   AWS_REGION: z.string().optional(),
   S3_ENDPOINT: z.string().url().optional(),

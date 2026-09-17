@@ -425,6 +425,33 @@
           </label>
           <button class="primary-button" id="auth-submit" type="submit" data-i18n="auth.signIn">Anmelden</button>
           <button class="secondary-button" id="auth-mode" type="button" data-i18n="auth.needAccount">Neues Konto erstellen</button>
+          <button class="text-button" id="auth-forgot-password" type="button" data-i18n="auth.forgotPassword">Passwort vergessen?</button>
+        </form>
+        <div class="auth-providers" id="auth-providers">
+          <span data-i18n="auth.orContinueWith">Oder fortfahren mit</span>
+          <div id="auth-provider-buttons"></div>
+        </div>
+        <form class="auth-form" id="auth-reset-request" hidden>
+          <p data-i18n="auth.resetRequestHelp">Wir senden Ihnen einen zeitlich begrenzten Link zum Zurücksetzen.</p>
+          <label>
+            <span data-i18n="form.email">E-Mail</span>
+            <input name="email" type="email" autocomplete="email" required />
+          </label>
+          <button class="primary-button" type="submit" data-i18n="auth.sendResetLink">Reset-Link senden</button>
+          <button class="secondary-button auth-back-to-sign-in" type="button" data-i18n="auth.backToSignIn">Zurück zur Anmeldung</button>
+        </form>
+        <form class="auth-form" id="auth-reset-password" hidden>
+          <p data-i18n="auth.resetPasswordHelp">Legen Sie ein neues Passwort für Ihr Konto fest.</p>
+          <label>
+            <span data-i18n="auth.newPassword">Neues Passwort</span>
+            <input name="password" type="password" autocomplete="new-password" minlength="8" required />
+          </label>
+          <label>
+            <span data-i18n="auth.confirmPassword">Passwort bestätigen</span>
+            <input name="confirmPassword" type="password" autocomplete="new-password" minlength="8" required />
+          </label>
+          <button class="primary-button" type="submit" data-i18n="auth.resetPassword">Passwort zurücksetzen</button>
+          <button class="secondary-button auth-back-to-sign-in" type="button" data-i18n="auth.backToSignIn">Zurück zur Anmeldung</button>
         </form>
         <section class="auth-form" id="auth-signed-in" hidden>
           <strong id="auth-identity"></strong>
@@ -448,6 +475,15 @@
         </section>
       </div>
     </dialog>
-    <script type="module" src="app.js?v=3"></script>
+    <script>
+      window.SC_TRACKER_CONFIG = {
+        SC_TRACKER_API_URL: ["localhost", "127.0.0.1"].includes(location.hostname)
+          ? "http://127.0.0.1:3100/api/v1"
+          : "https://backend-meloy.vercel.app/api/v1",
+        SC_TRACKER_NEON_AUTH_URL: "https://ep-weathered-boat-b1i5bn4m.neonauth.c-5.eu-central-1.aws.neon.tech/sctracker/auth",
+        SC_TRACKER_AUTH_PROVIDERS: ["google"],
+      };
+    </script>
+    <script type="module" src="app.js?v=4"></script>
   </body>
 </html>

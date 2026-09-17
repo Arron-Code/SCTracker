@@ -1,14 +1,23 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import cors from "@fastify/cors";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import { z } from "zod";
-import type { Config } from "./config.js";
+import { loadConfig, type Config } from "./config.js";
 import type { JwtVerifier } from "./auth.js";
 import { actorContext } from "./context.js";
 import { AppError, installErrorHandler } from "./errors.js";
 import { normalizeGeometry } from "./geo.js";
-import type { DdsProvider, SatelliteProvider, StorageProvider } from "./providers.js";
-import type { Repository, ResourceType } from "./repository.js";
+import {
+  EuInformationSystemV3Provider,
+  S3StorageProvider,
+  SentinelHubProvider,
+  type DdsProvider,
+  type SatelliteProvider,
+  type StorageProvider,
+} from "./providers.js";
+import { PgRepository, type Repository, type ResourceType } from "./repository.js";
 
 export interface Providers {
   storage: StorageProvider;
@@ -98,6 +107,10 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     logger: options.config.NODE_ENV === "test" ? false : { level: options.config.LOG_LEVEL },
     requestIdHeader: "x-request-id",
   });
+  const allowedOrigins = new Set(options.config.FRONTEND_ORIGINS);
+  await app.register(cors, {
+    origin: (origin, callback) => callback(null, !origin || allowedOrigins.has(origin)),
+  });
   await app.register(swagger, {
     openapi: {
       info: { title: "SCTracker API", version: "1.0.0" },
@@ -124,6 +137,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   app.get("/health", { schema: { tags: ["system"], security: [] } }, async () =>
     data({ status: "ok", version: process.env.npm_package_version ?? "0.1.0" }),
+  );
+  app.get("/auth/config", { schema: { tags: ["auth"], security: [] } }, async () =>
+    data({
+      baseUrl: options.config.NEON_AUTH_BASE_URL ?? null,
+      emailPassword: Boolean(options.config.NEON_AUTH_BASE_URL),
+      passwordReset: Boolean(options.config.NEON_AUTH_BASE_URL),
+      providers: options.config.NEON_AUTH_BASE_URL ? options.config.AUTH_PROVIDERS : [],
+    }),
   );
 
   app.get("/api/v1/suppliers", { schema: { tags: ["suppliers"] } }, async (request) =>
@@ -377,4 +398,31 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   });
 
   return app;
+}
+
+let productionApp: Promise<FastifyInstance> | undefined;
+
+function getProductionApp(): Promise<FastifyInstance> {
+  productionApp ??= (async () => {
+    const config = loadConfig();
+    return buildApp({
+      config,
+      repository: PgRepository.connect(config.DATABASE_URL),
+      providers: {
+        storage: new S3StorageProvider(config),
+        satellite: new SentinelHubProvider(config),
+        dds: new EuInformationSystemV3Provider(config),
+      },
+    });
+  })();
+  return productionApp;
+}
+
+export default async function handler(
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  const app = await getProductionApp();
+  await app.ready();
+  app.server.emit("request", request, response);
 }

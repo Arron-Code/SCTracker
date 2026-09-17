@@ -14,6 +14,8 @@ const baseConfig: Config = {
   LOG_LEVEL: "silent",
   DEV_AUTH_ENABLED: false,
   NEON_AUTH_BASE_URL: `${origin}/sctracker/auth`,
+  AUTH_PROVIDERS: ["google"],
+  FRONTEND_ORIGINS: ["https://app.example.test"],
   WORKER_POLL_MS: 10,
   SENTINEL_HUB_BASE_URL: "https://example.invalid",
   S3_FORCE_PATH_STYLE: false,

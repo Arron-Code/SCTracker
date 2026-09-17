@@ -1205,6 +1205,38 @@ tr:last-child td {
   gap: 14px;
 }
 
+.auth-form p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.auth-providers {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.auth-providers button,
+.auth-providers > div {
+  width: 100%;
+}
+
+.text-button {
+  padding: 4px;
+  border: 0;
+  color: var(--green-700);
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .auth-form.nested {
   padding-top: 14px;
   border-top: 1px solid var(--line);

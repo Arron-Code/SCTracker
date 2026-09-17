@@ -12,6 +12,8 @@ const config: Config = {
   DATABASE_URL: "postgres://unused",
   LOG_LEVEL: "silent",
   DEV_AUTH_ENABLED: true,
+  AUTH_PROVIDERS: ["google"],
+  FRONTEND_ORIGINS: ["https://app.example.test"],
   WORKER_POLL_MS: 10,
   SENTINEL_HUB_BASE_URL: "https://example.invalid",
   S3_FORCE_PATH_STYLE: false,
@@ -55,6 +57,54 @@ describe("SCTracker API", () => {
       },
     };
   }, 15_000);
+
+  it("publishes password reset and identity-provider capabilities without authentication", async () => {
+    const app = await buildApp({
+      config: {
+        ...config,
+        NEON_AUTH_BASE_URL: "https://auth.example.test/sctracker/auth",
+        AUTH_PROVIDERS: ["google"],
+      },
+      repository,
+      providers,
+    });
+    const response = await app.inject({ method: "GET", url: "/auth/config" });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      data: {
+        baseUrl: "https://auth.example.test/sctracker/auth",
+        emailPassword: true,
+        passwordReset: true,
+        providers: ["google"],
+      },
+    });
+    await app.close();
+  }, 15_000);
+
+  it("allows configured frontend origins without opening CORS to arbitrary sites", async () => {
+    const app = await buildApp({ config, repository, providers });
+    const allowed = await app.inject({
+      method: "OPTIONS",
+      url: "/api/v1/suppliers",
+      headers: {
+        origin: "https://app.example.test",
+        "access-control-request-method": "GET",
+      },
+    });
+    expect(allowed.statusCode).toBe(204);
+    expect(allowed.headers["access-control-allow-origin"]).toBe("https://app.example.test");
+
+    const denied = await app.inject({
+      method: "OPTIONS",
+      url: "/api/v1/suppliers",
+      headers: {
+        origin: "https://untrusted.example.test",
+        "access-control-request-method": "GET",
+      },
+    });
+    expect(denied.headers["access-control-allow-origin"]).toBeUndefined();
+    await app.close();
+  });
 
   it("creates tenant-isolated suppliers and normalized plots", async () => {
     const app = await buildApp({ config, repository, providers });

@@ -19,6 +19,13 @@ export function getAuthBaseUrl(runtime = globalThis.SC_TRACKER_CONFIG ?? {}) {
     : null;
 }
 
+export function getAuthProviders(runtime = globalThis.SC_TRACKER_CONFIG ?? {}) {
+  const configured = runtime.SC_TRACKER_AUTH_PROVIDERS ?? runtime.authProviders ?? ["google"];
+  return Array.isArray(configured)
+    ? configured.filter((provider) => typeof provider === "string" && provider.trim())
+    : [];
+}
+
 function unwrap(result, fallbackMessage) {
   if (result?.error) {
     throw new AuthError(
@@ -35,7 +42,9 @@ export function tokenFromClient(client) {
 }
 
 export function createManagedAuth(options = {}) {
-  const baseUrl = getAuthBaseUrl(options.config);
+  const runtime = options.config ?? globalThis.SC_TRACKER_CONFIG ?? {};
+  const baseUrl = getAuthBaseUrl(runtime);
+  const providers = getAuthProviders(runtime);
   const client = baseUrl
     ? (options.createClient ?? createAuthClient)(baseUrl)
     : null;
@@ -53,6 +62,7 @@ export function createManagedAuth(options = {}) {
   return {
     baseUrl,
     configured: client !== null,
+    providers,
     getSession: async () => unwrap(
       await requireClient().getSession(),
       "Could not load the session.",
@@ -62,9 +72,26 @@ export function createManagedAuth(options = {}) {
       await requireClient().signIn.email({ email, password }),
       "Sign-in failed.",
     ),
+    signInWithProvider: async (provider, callbackURL) => {
+      if (!providers.includes(provider)) {
+        throw new AuthError("PROVIDER_NOT_CONFIGURED", `Authentication provider '${provider}' is not configured.`);
+      }
+      return unwrap(
+        await requireClient().signIn.social({ provider, callbackURL }),
+        "Provider sign-in failed.",
+      );
+    },
     signUp: async (name, email, password) => unwrap(
       await requireClient().signUp.email({ name, email, password }),
       "Sign-up failed.",
+    ),
+    requestPasswordReset: async (email, redirectTo) => unwrap(
+      await requireClient().requestPasswordReset({ email, redirectTo }),
+      "Could not send the password reset email.",
+    ),
+    resetPassword: async (newPassword, token) => unwrap(
+      await requireClient().resetPassword({ newPassword, token }),
+      "Could not reset the password.",
     ),
     signOut: async () => unwrap(
       await requireClient().signOut(),

@@ -23,7 +23,14 @@ development auth is enabled.
 
 For production, set `NEON_AUTH_BASE_URL` to the Managed Better Auth URL (for this deployment,
 `https://ep-weathered-boat-b1i5bn4m.neonauth.c-5.eu-central-1.aws.neon.tech/sctracker/auth`) and
-leave `DEV_AUTH_ENABLED=false`. API requests require `Authorization: Bearer <token>`. The backend
+leave `DEV_AUTH_ENABLED=false`. Set `AUTH_PROVIDERS=google` to publish the enabled social
+providers and set `FRONTEND_ORIGINS` to the comma-separated browser origins allowed to call
+the API. `GET /auth/config` exposes the non-secret Auth URL and supported email-password,
+password-reset, and identity-provider capabilities so clients can render consistent sign-in
+options. Passwords and reset tokens remain between the client and Neon Auth and are never
+proxied or persisted by this API.
+
+API requests require `Authorization: Bearer <token>`. The backend
 caches the remote JWKS from `<NEON_AUTH_BASE_URL>/.well-known/jwks.json` and verifies EdDSA
 signatures, expiry, and the exact issuer and audience origin. Missing configuration returns
 `AUTH_NOT_CONFIGURED`; invalid tokens or claims return `UNAUTHENTICATED`.

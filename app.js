@@ -1,5 +1,5 @@
 import { createApiClient, ApiError } from "./src/api.mjs?v=2";
-import { createManagedAuth, AuthError } from "./src/auth.mjs?v=1";
+import { createManagedAuth, AuthError } from "./src/auth.mjs?v=2";
 import { calculateCompletion, validateMassBalance } from "./src/domain.mjs?v=1";
 import { parseGeoJson } from "./src/geojson.mjs?v=2";
 import {
@@ -57,6 +57,11 @@ const authOrganization = document.querySelector("#auth-organization");
 const authSubmit = document.querySelector("#auth-submit");
 const authMode = document.querySelector("#auth-mode");
 const authNameField = document.querySelector("#auth-name-field");
+const authForgotPassword = document.querySelector("#auth-forgot-password");
+const authProviders = document.querySelector("#auth-providers");
+const authProviderButtons = document.querySelector("#auth-provider-buttons");
+const authResetRequest = document.querySelector("#auth-reset-request");
+const authResetPassword = document.querySelector("#auth-reset-password");
 const organizationForm = document.querySelector("#organization-form");
 const organizationSelect = document.querySelector("#organization-select");
 const organizationSelectButton = document.querySelector("#organization-select-button");
@@ -64,7 +69,8 @@ const signOutButton = document.querySelector("#sign-out-button");
 let activeDialog;
 let activeLanguage = getInitialLanguage();
 let toastTimer;
-let authAction = "signIn";
+let resetToken = new URLSearchParams(location.search).get("token");
+let authAction = resetToken ? "resetPassword" : "signIn";
 const authState = {
   loading: auth.configured,
   session: null,
@@ -286,19 +292,23 @@ function setLanguage(language) {
 }
 
 function setAuthBusy(busy) {
-  authSubmit.disabled = busy;
-  authMode.disabled = busy;
+  authDialog.querySelectorAll("button:not(.dialog-close)").forEach((button) => {
+    button.disabled = busy;
+  });
   organizationSelectButton.disabled = busy || !organizationSelect.value;
-  signOutButton.disabled = busy;
   authStatus.textContent = busy ? t("auth.loading") : "";
 }
 
 function renderAuth() {
   const session = authState.session;
+  const isResettingPassword = authAction === "resetPassword";
   authButton.textContent = session?.user?.name ?? t("auth.account");
   authButton.setAttribute("aria-label", session ? t("auth.manage") : t("auth.signIn"));
-  authSignedOut.hidden = Boolean(session);
-  authSignedIn.hidden = !session;
+  authSignedOut.hidden = Boolean(session) || !["signIn", "signUp"].includes(authAction);
+  authResetRequest.hidden = Boolean(session) || authAction !== "requestReset";
+  authResetPassword.hidden = !isResettingPassword;
+  authProviders.hidden = Boolean(session) || authAction !== "signIn" || auth.providers.length === 0;
+  authSignedIn.hidden = !session || isResettingPassword;
   authError.textContent = authState.error ? errorMessage(authState.error) : "";
   authStatus.textContent = authState.loading ? t("auth.loading") : "";
 
@@ -307,6 +317,11 @@ function renderAuth() {
     return;
   }
   if (!session) {
+    authProviderButtons.innerHTML = auth.providers.map((provider) => `
+      <button class="secondary-button" type="button" data-auth-provider="${escapeHtml(provider)}">
+        ${escapeHtml(t(`auth.provider.${provider}`))}
+      </button>
+    `).join("");
     authSubmit.textContent = t(authAction === "signIn" ? "auth.signIn" : "auth.signUp");
     authMode.textContent = t(authAction === "signIn" ? "auth.needAccount" : "auth.haveAccount");
     authNameField.hidden = authAction === "signIn";
@@ -599,7 +614,28 @@ authButton.addEventListener("click", () => {
 authDialog.querySelector(".dialog-close").addEventListener("click", () => authDialog.close());
 authMode.addEventListener("click", () => {
   authAction = authAction === "signIn" ? "signUp" : "signIn";
+  authState.error = null;
   renderAuth();
+});
+authForgotPassword.addEventListener("click", () => {
+  authAction = "requestReset";
+  authState.error = null;
+  renderAuth();
+});
+authDialog.querySelectorAll(".auth-back-to-sign-in").forEach((button) => {
+  button.addEventListener("click", () => {
+    authAction = "signIn";
+    resetToken = null;
+    authState.error = null;
+    history.replaceState(null, "", `${location.pathname}${location.hash}`);
+    renderAuth();
+  });
+});
+authProviderButtons.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-auth-provider]");
+  if (!button) return;
+  const callbackURL = `${location.origin}${location.pathname}`;
+  void runAuthAction(() => auth.signInWithProvider(button.dataset.authProvider, callbackURL));
 });
 authSignedOut.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -607,6 +643,36 @@ authSignedOut.addEventListener("submit", (event) => {
   void runAuthAction(() => authAction === "signIn"
     ? auth.signIn(form.get("email").trim(), form.get("password"))
     : auth.signUp(form.get("name").trim(), form.get("email").trim(), form.get("password")));
+});
+authResetRequest.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const form = new FormData(authResetRequest);
+  const redirectTo = new URL(location.pathname, location.origin);
+  redirectTo.searchParams.set("password-reset", "1");
+  void runAuthAction(async () => {
+    await auth.requestPasswordReset(form.get("email").trim(), redirectTo.toString());
+    authAction = "signIn";
+    authResetRequest.reset();
+    showToast(t("auth.resetEmailSent"));
+  });
+});
+authResetPassword.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const form = new FormData(authResetPassword);
+  const password = form.get("password");
+  if (password !== form.get("confirmPassword")) {
+    authState.error = new AuthError("PASSWORD_MISMATCH", t("auth.passwordMismatch"));
+    renderAuth();
+    return;
+  }
+  void runAuthAction(async () => {
+    await auth.resetPassword(password, resetToken);
+    resetToken = null;
+    authAction = "signIn";
+    authResetPassword.reset();
+    history.replaceState(null, "", `${location.pathname}${location.hash}`);
+    showToast(t("auth.passwordResetComplete"));
+  });
 });
 organizationForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -633,6 +699,7 @@ signOutButton.addEventListener("click", () => void runAuthAction(async () => {
 
 if (!balance.balanced) console.warn("Shipment mass balance is not balanced", balance);
 setLanguage(activeLanguage);
+if (resetToken) authDialog.showModal();
 void refreshAuth().then(() => {
   if (authState.session?.session?.activeOrganizationId) {
     return loadResources();

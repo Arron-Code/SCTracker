@@ -31,7 +31,8 @@ By default, the web client calls the same origin under `/api/v1`. Deployments ca
 <script>
   window.SC_TRACKER_CONFIG = {
     SC_TRACKER_API_URL: "https://api.example.com/api/v1",
-    SC_TRACKER_NEON_AUTH_URL: "https://your-neon-auth-host.example/neondb/auth"
+    SC_TRACKER_NEON_AUTH_URL: "https://your-neon-auth-host.example/neondb/auth",
+    SC_TRACKER_AUTH_PROVIDERS: ["google"]
   };
 </script>
 ```
@@ -42,8 +43,11 @@ Neither value is a secret. The repository bundles the pinned
 `@neondatabase/auth` browser client locally with `npm run build:auth`; production
 does not execute third-party CDN code.
 
-The account dialog supports email sign-up, sign-in, sign-out, and organization
-creation/selection. API requests call Neon Auth's `token()` endpoint immediately
+The account dialog supports email sign-up, sign-in, password reset, Google sign-in,
+sign-out, and organization creation/selection. Add further social providers to
+`SC_TRACKER_AUTH_PROVIDERS` after enabling them in Neon Auth. Password reset links
+return to the current web application and are consumed without storing the token.
+API requests call Neon Auth's `token()` endpoint immediately
 before each request and send the returned short-lived JWT as
 `Authorization: Bearer <token>`. Raw JWTs are never written to `localStorage`.
 Users must select an active organization before protected API data is loaded.
