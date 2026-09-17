@@ -72,7 +72,7 @@ Mock API behavior is disabled by default. Enable the in-memory mock only for exp
 
 ## Mobile app
 
-The Android and iOS application is located in `mobile\`. It uses Expo and React Native and provides GPS coffee-plot capture, local offline drafts, supplier status, shipment readiness, and German, English, and Amharic guidance.
+The Android and iOS application is located in `mobile\`. It uses Expo and React Native and provides GPS coffee-plot capture, editable circular geofences, local offline drafts, supplier status, shipment readiness, and German, English, Amharic, and Tigrinya guidance.
 
 ```powershell
 Set-Location mobile
@@ -90,6 +90,13 @@ requested with `token()` for each API call and are never saved in AsyncStorage.
 Offline supplier and plot capture remains available while signed out or
 disconnected, and the existing outbox is retained until authenticated sync
 succeeds.
+
+Geofence centers are derived from three captured GPS positions. If they are
+missing, the app geocodes the selected supplier's country and region and then
+falls back to a country/region input dialog. The initial radius is calculated
+from the plot area. Background entry/exit monitoring requires a native
+development or production build with always-on location permission; Expo Go
+cannot provide the complete background behavior.
 
 ## Native iOS reference
 

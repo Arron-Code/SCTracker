@@ -136,13 +136,116 @@ describe("SCTracker API", () => {
           type: "Polygon",
           coordinates: [[[36.1, 7.1], [36.2, 7.1], [36.2, 7.2], [36.1, 7.2]]],
         },
+        geofence: {
+          center: [36.15, 7.15],
+          radiusMeters: 1000,
+          source: "gps",
+          enabled: true,
+          updatedAt: "2026-09-17T12:00:00.000Z",
+        },
       },
     });
     expect(plotResponse.statusCode).toBe(201);
     const ring = plotResponse.json().data.geometry.coordinates[0];
     expect(ring[0]).toEqual(ring.at(-1));
+    const inside = await app.inject({
+      method: "POST",
+      url: `/api/v1/plots/${plotResponse.json().data.id}/geofence/check`,
+      headers,
+      payload: { coordinates: [36.151, 7.15] },
+    });
+    expect(inside.statusCode).toBe(200);
+    expect(inside.json().data.inside).toBe(true);
+    const outside = await app.inject({
+      method: "POST",
+      url: `/api/v1/plots/${plotResponse.json().data.id}/geofence/check`,
+      headers,
+      payload: { coordinates: [36.2, 7.2] },
+    });
+    expect(outside.json().data.inside).toBe(false);
     await app.close();
   }, 120_000);
+
+  it("accepts mobile outbox operations and returns mobile pull changes", async () => {
+    const app = await buildApp({ config, repository, providers });
+    const supplierId = "00000000-0000-4000-8000-000000000010";
+    const operationId = "00000000-0000-4000-8000-000000000011";
+    const pushed = await app.inject({
+      method: "POST",
+      url: "/api/v1/sync/push",
+      headers: { ...headers, "idempotency-key": operationId },
+      payload: {
+        deviceId: "00000000-0000-4000-8000-000000000012",
+        operations: [{
+          id: operationId,
+          entityType: "supplier",
+          entityId: supplierId,
+          action: "upsert",
+          payload: {
+            id: supplierId,
+            name: "Kaffa Cooperative",
+            country: "Ethiopia",
+            region: "Kaffa",
+          },
+        }],
+      },
+    });
+    expect(pushed.statusCode).toBe(200);
+    expect(pushed.json().data.accepted).toEqual([operationId]);
+
+    const pulled = await app.inject({
+      method: "GET",
+      url: "/api/v1/sync/pull",
+      headers,
+    });
+    expect(pulled.statusCode).toBe(200);
+    expect(pulled.json().data.changes).toEqual([
+      expect.objectContaining({
+        entityType: "supplier",
+        entity: expect.objectContaining({ id: supplierId, region: "Kaffa" }),
+      }),
+    ]);
+
+    await repository.create("shipments", headers["x-tenant-id"], { reference: "SHIP-CURSOR" });
+    const nonMobileOnly = await app.inject({
+      method: "GET",
+      url: `/api/v1/sync/pull?cursor=${pulled.json().data.cursor}`,
+      headers,
+    });
+    expect(nonMobileOnly.json().data.changes).toEqual([]);
+    expect(nonMobileOnly.json().data.cursor).not.toBe(pulled.json().data.cursor);
+
+    const baseSupplier = await repository.get("suppliers", headers["x-tenant-id"], supplierId);
+    await repository.update("suppliers", headers["x-tenant-id"], supplierId, {
+      name: "Server edit",
+    });
+    const conflictOperationId = "00000000-0000-4000-8000-000000000013";
+    const conflicted = await app.inject({
+      method: "POST",
+      url: "/api/v1/sync/push",
+      headers: { ...headers, "idempotency-key": conflictOperationId },
+      payload: {
+        operations: [{
+          id: conflictOperationId,
+          entityType: "supplier",
+          entityId: supplierId,
+          action: "upsert",
+          expectedUpdatedAt: baseSupplier?.updatedAt,
+          payload: { name: "Mobile edit" },
+        }],
+      },
+    });
+    expect(conflicted.json().data.accepted).toEqual([]);
+    expect(conflicted.json().data.conflicts).toEqual([
+      expect.objectContaining({
+        operationId: conflictOperationId,
+        entityType: "supplier",
+        entityId: supplierId,
+        remote: expect.objectContaining({ name: "Server edit" }),
+      }),
+    ]);
+    await app.close();
+  });
 
   it("rejects mass-balance mismatches with the stable error envelope", async () => {
     const app = await buildApp({ config, repository, providers });

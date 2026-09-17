@@ -7,6 +7,16 @@ export type GeoJsonPolygon = {
 
 export type SyncStatus = "pending" | "syncing" | "synced" | "conflict" | "failed";
 
+export type Geofence = {
+  center: Position;
+  radiusMeters: number;
+  source: "gps" | "supplier" | "manual";
+  country?: string;
+  region?: string;
+  enabled: boolean;
+  updatedAt: string;
+};
+
 export type Plot = {
   id: string;
   supplierId?: string;
@@ -14,6 +24,7 @@ export type Plot = {
   farmName: string;
   areaHa: string;
   polygon: GeoJsonPolygon;
+  geofence?: Geofence;
   capturedAt: string;
   updatedAt: string;
   syncStatus: SyncStatus;
@@ -22,6 +33,7 @@ export type Plot = {
 export type Supplier = {
   id: string;
   name: string;
+  country: string;
   region: string;
   producerCount: number;
   plotCount: number;
@@ -57,6 +69,7 @@ export type OutboxOperation = {
   entityId: string;
   action: "upsert";
   payload: Supplier | Plot;
+  expectedUpdatedAt?: string;
   createdAt: string;
   attempts: number;
   nextAttemptAt?: string;
@@ -97,6 +110,10 @@ export type LegacyPlotDraft = {
 
 export type PushResponse = {
   accepted: string[];
+  applied?: Array<{
+    operationId?: string;
+    resource: Supplier | Plot;
+  }>;
   conflicts?: Array<{
     operationId: string;
     entityType: OutboxOperation["entityType"];

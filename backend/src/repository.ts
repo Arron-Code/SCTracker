@@ -53,6 +53,18 @@ function now(): string {
   return new Date().toISOString();
 }
 
+function resourceId(payload: Record<string, unknown>): string {
+  const requested = payload.id;
+  if (typeof requested === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requested)) {
+    return requested;
+  }
+  return randomUUID();
+}
+
+function resourcePayload(payload: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(payload).filter(([key]) => key !== "id"));
+}
+
 export class MemoryRepository implements Repository {
   private readonly resources = new Map<ResourceType, Map<string, Resource>>();
   private readonly idempotency = new Map<string, unknown>();
@@ -70,8 +82,8 @@ export class MemoryRepository implements Repository {
   async create(type: ResourceType, tenantId: string, payload: Record<string, unknown>): Promise<Resource> {
     const timestamp = now();
     const resource: Resource = {
-      ...payload,
-      id: randomUUID(),
+      ...resourcePayload(payload),
+      id: resourceId(payload),
       tenantId,
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -186,13 +198,14 @@ export class PgRepository implements Repository {
   }
 
   async create(type: ResourceType, tenantId: string, payload: Record<string, unknown>): Promise<Resource> {
-    const id = randomUUID();
+    const id = resourceId(payload);
+    const storedPayload = resourcePayload(payload);
     const status = typeof payload.status === "string" ? payload.status : null;
     const result = await this.pool.query(
       `INSERT INTO ${tableByType[type]} (id, tenant_id, status, payload)
        VALUES ($1, $2, $3, $4::jsonb)
        RETURNING id, tenant_id, status, payload, created_at, updated_at`,
-      [id, tenantId, status, JSON.stringify(payload)],
+      [id, tenantId, status, JSON.stringify(storedPayload)],
     );
     const resource = fromRow(result.rows[0]);
     await this.recordChange(type, resource);

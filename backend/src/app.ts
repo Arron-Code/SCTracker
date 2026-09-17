@@ -8,7 +8,7 @@ import { loadConfig, type Config } from "./config.js";
 import type { JwtVerifier } from "./auth.js";
 import { actorContext } from "./context.js";
 import { AppError, installErrorHandler } from "./errors.js";
-import { normalizeGeometry } from "./geo.js";
+import { geofenceDistanceMeters, geofenceSchema, normalizeGeometry } from "./geo.js";
 import {
   EuInformationSystemV3Provider,
   S3StorageProvider,
@@ -17,7 +17,7 @@ import {
   type SatelliteProvider,
   type StorageProvider,
 } from "./providers.js";
-import { PgRepository, type Repository, type ResourceType } from "./repository.js";
+import { PgRepository, type Change, type Repository, type ResourceType } from "./repository.js";
 
 export interface Providers {
   storage: StorageProvider;
@@ -46,6 +46,7 @@ const plotInput = z.object({
   name,
   geometry: z.unknown(),
   areaHectares: z.number().positive().optional(),
+  geofence: geofenceSchema.optional(),
 });
 const shipmentInput = z.object({
   reference: name,
@@ -86,12 +87,21 @@ const ddsDraft = z.object({
   quantityKg: z.number().positive(),
   dueDiligenceStatement: z.string().min(20),
 });
-const syncOperation = z.object({
+const legacySyncOperation = z.object({
   resourceType: z.enum(["suppliers", "plots", "shipments"]),
   resourceId: uuid.optional(),
   expectedUpdatedAt: z.string().datetime().optional(),
   payload: z.record(z.string(), z.unknown()),
 });
+const mobileSyncOperation = z.object({
+  id: uuid,
+  entityType: z.enum(["supplier", "plot"]),
+  entityId: uuid,
+  action: z.literal("upsert"),
+  payload: z.record(z.string(), z.unknown()),
+  expectedUpdatedAt: z.string().datetime().optional(),
+});
+const syncOperation = z.union([legacySyncOperation, mobileSyncOperation]);
 
 function data<T>(value: T, meta?: Record<string, unknown>): { data: T; meta?: Record<string, unknown> } {
   return meta ? { data: value, meta } : { data: value };
@@ -100,6 +110,46 @@ function data<T>(value: T, meta?: Record<string, unknown>): { data: T; meta?: Re
 function requireFound<T>(value: T | null, label: string): T {
   if (!value) throw new AppError("NOT_FOUND", `${label} not found`, 404);
   return value;
+}
+
+function mobileChange(change: Change) {
+  if (change.resourceType === "suppliers") {
+    const country = change.payload.country ?? change.payload.countryCode ?? "";
+    return {
+      entityType: "supplier" as const,
+      entity: {
+        ...change.payload,
+        name: String(change.payload.name ?? ""),
+        country: String(country),
+        region: String(change.payload.region ?? ""),
+        producerCount: Number(change.payload.producerCount ?? 0),
+        plotCount: Number(change.payload.plotCount ?? 0),
+        syncStatus: "synced",
+      },
+    };
+  }
+  if (change.resourceType !== "plots") return null;
+  const polygon = change.payload.polygon ?? change.payload.geometry;
+  if (
+    !polygon ||
+    typeof polygon !== "object" ||
+    !("type" in polygon) ||
+    polygon.type !== "Polygon"
+  ) {
+    return null;
+  }
+  const nameValue = String(change.payload.name ?? "");
+  return {
+    entityType: "plot" as const,
+    entity: {
+      ...change.payload,
+      producer: String(change.payload.producer ?? nameValue),
+      farmName: String(change.payload.farmName ?? nameValue),
+      areaHa: String(change.payload.areaHa ?? change.payload.areaHectares ?? "0"),
+      polygon,
+      syncStatus: "synced",
+    },
+  };
 }
 
 export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
@@ -211,6 +261,27 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.get("/api/v1/plots/:id", { schema: { tags: ["plots"] } }, async (request) => {
     const { id } = z.object({ id: uuid }).parse(request.params);
     return data(requireFound(await options.repository.get("plots", request.actor.tenantId, id), "Plot"));
+  });
+  app.post("/api/v1/plots/:id/geofence/check", { schema: { tags: ["geofencing"] } }, async (request) => {
+    const { id } = z.object({ id: uuid }).parse(request.params);
+    const { coordinates } = z.object({
+      coordinates: z.tuple([
+        z.number().min(-180).max(180),
+        z.number().min(-90).max(90),
+      ]),
+    }).parse(request.body);
+    const plot = requireFound(
+      await options.repository.get("plots", request.actor.tenantId, id),
+      "Plot",
+    );
+    const geofence = geofenceSchema.parse(plot.geofence);
+    const distanceMeters = geofenceDistanceMeters(geofence, coordinates);
+    return data({
+      plotId: id,
+      inside: geofence.enabled && distanceMeters <= geofence.radiusMeters,
+      distanceMeters,
+      radiusMeters: geofence.radiusMeters,
+    });
   });
   app.patch("/api/v1/plots/:id", { schema: { tags: ["plots"] } }, async (request) => {
     const { id } = z.object({ id: uuid }).parse(request.params);
@@ -364,40 +435,81 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     const body = z.object({ operations: z.array(syncOperation).min(1).max(100) }).parse(request.body);
     const applied = [];
     const conflicts = [];
+    const accepted: string[] = [];
     for (let index = 0; index < body.operations.length; index += 1) {
       const operation = body.operations[index]!;
       try {
-        const resource = operation.resourceId
-          ? await options.repository.update(
-              operation.resourceType as ResourceType,
+        const mobile = "entityType" in operation;
+        if (mobile && operation.entityType === "plot" && operation.payload.geofence !== undefined) {
+          geofenceSchema.parse(operation.payload.geofence);
+        }
+        const resourceType = mobile
+          ? operation.entityType === "supplier" ? "suppliers" : "plots"
+          : operation.resourceType;
+        const targetId = mobile ? operation.entityId : operation.resourceId;
+        const existing = mobile
+          ? await options.repository.get(
+              resourceType as ResourceType,
               request.actor.tenantId,
-              operation.resourceId,
+              operation.entityId,
+            )
+          : null;
+        const resource = targetId && (!mobile || existing)
+          ? await options.repository.update(
+              resourceType as ResourceType,
+              request.actor.tenantId,
+              targetId,
               operation.payload,
               operation.expectedUpdatedAt,
             )
           : await options.repository.create(
-              operation.resourceType as ResourceType,
+              resourceType as ResourceType,
               request.actor.tenantId,
-              operation.payload,
+              mobile ? { ...operation.payload, id: targetId } : operation.payload,
             );
-        applied.push({ index, resource });
+        applied.push({ index, resource, ...mobile ? { operationId: operation.id } : {} });
+        if (mobile) accepted.push(operation.id);
       } catch (error) {
         if (error instanceof AppError && error.code === "SYNC_CONFLICT") {
-          conflicts.push({ index, resourceId: operation.resourceId, details: error.details });
+          if ("entityType" in operation) {
+            const details = error.details as { current?: unknown } | undefined;
+            conflicts.push({
+              operationId: operation.id,
+              entityType: operation.entityType,
+              entityId: operation.entityId,
+              remote: details?.current,
+            });
+          } else {
+            conflicts.push({
+              index,
+              resourceId: operation.resourceId,
+              details: error.details,
+            });
+          }
           continue;
         }
         throw error;
       }
     }
-    const response = { applied, conflicts };
+    const response = {
+      applied,
+      conflicts,
+      accepted,
+    };
     await options.repository.saveIdempotency(request.actor.tenantId, idempotencyKey, response);
     return data(response);
   });
   app.get("/api/v1/sync/pull", { schema: { tags: ["sync"] } }, async (request) => {
     const { cursor } = z.object({ cursor: z.coerce.number().int().nonnegative().default(0) }).parse(request.query);
-    const changes = await options.repository.changes(request.actor.tenantId, cursor, 500);
-    const nextCursor = changes.at(-1)?.sequence ?? cursor;
-    return data(changes, { cursor: nextCursor, hasMore: changes.length === 500 });
+    const rawChanges = await options.repository.changes(request.actor.tenantId, cursor, 500);
+    const changes = rawChanges
+      .map(mobileChange)
+      .filter((change) => change !== null);
+    const nextCursor = rawChanges.at(-1)?.sequence ?? cursor;
+    return data({
+      cursor: String(nextCursor),
+      changes,
+    }, { hasMore: rawChanges.length === 500 });
   });
 
   return app;

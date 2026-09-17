@@ -18,6 +18,7 @@ export type Translation = {
     share: string;
     status: string;
     name: string;
+    country: string;
     region: string;
     subjectId: string;
     pending: string;
@@ -69,6 +70,21 @@ export type Translation = {
     gpsError: string;
     permissionError: string;
   };
+  geofencing: {
+    title: string;
+    configure: string;
+    open: string;
+    centerHint: string;
+    radius: string;
+    locationRequired: string;
+    locationRequiredDetail: string;
+    useLocation: string;
+    locating: string;
+    locationNotFound: string;
+    backgroundPermissionError: string;
+    plotNotFound: string;
+    saved: string;
+  };
   operations: {
     title: string;
     documents: string;
@@ -113,7 +129,7 @@ export const translations = {
     tabs: { home: "Start", suppliers: "Partner", plots: "Plots", operations: "Vorgänge", help: "Hilfe" },
     common: {
       save: "Speichern", create: "Erstellen", refresh: "Aktualisieren", retry: "Erneut versuchen",
-      download: "Herunterladen", share: "Teilen", status: "Status", name: "Name", region: "Region",
+      download: "Herunterladen", share: "Teilen", status: "Status", name: "Name", country: "Land", region: "Region",
       subjectId: "Referenz-ID", pending: "Ausstehend", synced: "Synchronisiert", failed: "Fehlgeschlagen",
       conflict: "Konflikt",
     },
@@ -140,6 +156,16 @@ export const translations = {
       importGeoJson: "GeoJSON importieren", applyGeoJson: "GeoJSON übernehmen", saveDraft: "Offline-Plot speichern",
       empty: "Noch keine Plot-Entwürfe.", invalidPolygon: "Das Polygon ist ungültig. Mindestens drei unterschiedliche Positionen sind erforderlich.",
       gpsError: "Der Standort konnte nicht ermittelt werden.", permissionError: "Standortberechtigung wurde nicht erteilt.",
+    },
+    geofencing: {
+      title: "Geofencing", configure: "Geofencing einrichten", open: "Geofencing öffnen",
+      centerHint: "Grüner Marker: Mittelpunkt. Oranger Marker: Radius. Beide Marker können verschoben werden.",
+      radius: "Radius (Meter)", locationRequired: "Land und Region erforderlich",
+      locationRequiredDetail: "GPS- und vollständige Lieferantendaten fehlen. Geben Sie Land und Region für den Mittelpunkt ein.",
+      useLocation: "Region verwenden", locating: "Region wird ermittelt ...",
+      locationNotFound: "Für Land und Region konnte kein Standort ermittelt werden.",
+      backgroundPermissionError: "Der Geofence wurde gespeichert, aber die Hintergrundüberwachung konnte nicht aktiviert werden. Erlauben Sie den Standortzugriff immer.",
+      plotNotFound: "Der Plot wurde nicht gefunden.", saved: "Geofence gespeichert und Überwachung aktualisiert.",
     },
     operations: {
       title: "Compliance-Vorgänge", documents: "Dokumente", pickUpload: "Dokument auswählen und hochladen",
@@ -170,7 +196,7 @@ export const translations = {
     tabs: { home: "Home", suppliers: "Partners", plots: "Plots", operations: "Operations", help: "Help" },
     common: {
       save: "Save", create: "Create", refresh: "Refresh", retry: "Retry", download: "Download",
-      share: "Share", status: "Status", name: "Name", region: "Region", subjectId: "Reference ID",
+      share: "Share", status: "Status", name: "Name", country: "Country", region: "Region", subjectId: "Reference ID",
       pending: "Pending", synced: "Synced", failed: "Failed", conflict: "Conflict",
     },
     sync: {
@@ -196,6 +222,16 @@ export const translations = {
       importGeoJson: "Import GeoJSON", applyGeoJson: "Apply GeoJSON", saveDraft: "Save offline plot",
       empty: "No plot drafts yet.", invalidPolygon: "The polygon is invalid. At least three distinct positions are required.",
       gpsError: "The current location could not be determined.", permissionError: "Location permission was not granted.",
+    },
+    geofencing: {
+      title: "Geofencing", configure: "Configure geofencing", open: "Open geofencing",
+      centerHint: "Green marker: center. Orange marker: radius. Drag either marker to adjust the circle.",
+      radius: "Radius (meters)", locationRequired: "Country and region required",
+      locationRequiredDetail: "GPS and complete supplier location data are unavailable. Enter a country and region for the center.",
+      useLocation: "Use region", locating: "Locating region ...",
+      locationNotFound: "No location could be found for the supplied country and region.",
+      backgroundPermissionError: "The geofence was saved, but background monitoring could not be enabled. Allow location access at all times.",
+      plotNotFound: "The plot could not be found.", saved: "Geofence saved and monitoring updated.",
     },
     operations: {
       title: "Compliance operations", documents: "Documents", pickUpload: "Pick and upload document",
@@ -225,7 +261,7 @@ export const translations = {
     tabs: { home: "መነሻ", suppliers: "አጋሮች", plots: "መሬቶች", operations: "ሂደቶች", help: "እገዛ" },
     common: {
       save: "አስቀምጥ", create: "ፍጠር", refresh: "አድስ", retry: "እንደገና ሞክር", download: "አውርድ",
-      share: "አጋራ", status: "ሁኔታ", name: "ስም", region: "ክልል", subjectId: "የማጣቀሻ መለያ",
+      share: "አጋራ", status: "ሁኔታ", name: "ስም", country: "አገር", region: "ክልል", subjectId: "የማጣቀሻ መለያ",
       pending: "በመጠባበቅ ላይ", synced: "ተመሳስሏል", failed: "አልተሳካም", conflict: "ግጭት",
     },
     sync: {
@@ -252,6 +288,16 @@ export const translations = {
       saveDraft: "መሬቱን ከመስመር ውጭ አስቀምጥ", empty: "ገና የመሬት ረቂቅ የለም።",
       invalidPolygon: "ፖሊጎኑ ትክክል አይደለም። ቢያንስ ሶስት የተለያዩ ቦታዎች ያስፈልጋሉ።",
       gpsError: "የአሁኑን ቦታ ማወቅ አልተቻለም።", permissionError: "የቦታ ፈቃድ አልተሰጠም።",
+    },
+    geofencing: {
+      title: "Geofencing", configure: "Geofencing አዋቅር", open: "Geofencing ክፈት",
+      centerHint: "አረንጓዴው ምልክት መሃል፣ ብርቱካናማው ራዲየስ ነው። ሁለቱንም መጎተት ይቻላል።",
+      radius: "ራዲየስ (ሜትር)", locationRequired: "አገርና ክልል ያስፈልጋሉ",
+      locationRequiredDetail: "GPS እና ሙሉ የአቅራቢ አድራሻ የሉም። አገርና ክልል ያስገቡ።",
+      useLocation: "ክልሉን ተጠቀም", locating: "ክልሉ እየተፈለገ ነው ...",
+      locationNotFound: "ለተሰጠው አገርና ክልል ቦታ አልተገኘም።",
+      backgroundPermissionError: "Geofence ተቀምጧል፣ ግን የጀርባ ክትትል አልነቃም። ሁልጊዜ የቦታ ፈቃድ ይስጡ።",
+      plotNotFound: "መሬቱ አልተገኘም።", saved: "Geofence ተቀምጧል።",
     },
     operations: {
       title: "የተገዢነት ሂደቶች", documents: "ሰነዶች", pickUpload: "ሰነድ ምረጥና ስቀል",
@@ -281,7 +327,7 @@ export const translations = {
     tabs: { home: "መበገሲ", suppliers: "መሻርኽቲ", plots: "ግራውቲ", operations: "መስርሓት", help: "ሓገዝ" },
     common: {
       save: "ዓቅብ", create: "ፍጠር", refresh: "ኣሐድስ", retry: "ደጊምካ ፈትን", download: "ኣውርድ",
-      share: "ኣካፍል", status: "ኩነታት", name: "ስም", region: "ክልል", subjectId: "መወከሲ መለለዪ",
+      share: "ኣካፍል", status: "ኩነታት", name: "ስም", country: "ሃገር", region: "ክልል", subjectId: "መወከሲ መለለዪ",
       pending: "ይጽበ ኣሎ", synced: "ተመሳሲሉ", failed: "ኣይተዓወተን", conflict: "ግጭት",
     },
     sync: {
@@ -308,6 +354,16 @@ export const translations = {
       saveDraft: "ግራት ካብ መስመር ወጻኢ ዓቅብ", empty: "ገና ንድፊ ግራት የለን።",
       invalidPolygon: "እቲ ፖሊጎን ቅኑዕ ኣይኮነን። እንተወሓደ ሰለስተ ዝተፈላለዩ ቦታታት የድልዩ።",
       gpsError: "እዋናዊ ቦታ ክፍለጥ ኣይከኣለን።", permissionError: "ፍቓድ ቦታ ኣይተዋህበን።",
+    },
+    geofencing: {
+      title: "Geofencing", configure: "Geofencing ኣዋድድ", open: "Geofencing ክፈት",
+      centerHint: "ቀጠልያ ምልክት ማእከል፣ ኣራንሾኒ ምልክት ራድየስ እዩ። ክልቲኦም ክስሓቡ ይኽእሉ።",
+      radius: "ራድየስ (ሜትር)", locationRequired: "ሃገርን ዞባን የድሊ",
+      locationRequiredDetail: "GPSን ምሉእ ሓበሬታ ኣቕራብን የለን። ሃገርን ዞባን የእትዉ።",
+      useLocation: "ዞባ ተጠቐም", locating: "ዞባ ይድለ ኣሎ ...",
+      locationNotFound: "ንዝተዋህበ ሃገርን ዞባን ቦታ ኣይተረኽበን።",
+      backgroundPermissionError: "Geofence ተዓቂቡ፣ ግን ናይ ድሕረ ባይታ ክትትል ኣይተነቓቐሐን። ኩሉ ግዜ ፍቓድ ቦታ ሃቡ።",
+      plotNotFound: "እቲ ግራት ኣይተረኽበን።", saved: "Geofence ተዓቂቡ።",
     },
     operations: {
       title: "መስርሓት ምኽባር ሕጊ", documents: "ሰነዳት", pickUpload: "ሰነድ ምረጽን ስቐልን",

@@ -38,22 +38,34 @@ export async function synchronize(input: PersistedState, force = false): Promise
       const conflicts = pushed.conflicts ?? [];
       const conflictIds = new Set(conflicts.map((item) => item.operationId));
       const acceptedEntities = ready.filter((item) => accepted.has(item.id));
+      const appliedByOperation = new Map<string, Supplier | Plot>();
+      for (const item of pushed.applied ?? []) {
+        if (item.operationId) appliedByOperation.set(item.operationId, item.resource);
+      }
       state = {
         ...state,
-        suppliers: state.suppliers.map((supplier) =>
-          acceptedEntities.some(
+        suppliers: state.suppliers.map((supplier) => {
+          const operation = acceptedEntities.find(
             (item) => item.entityType === "supplier" && item.entityId === supplier.id,
-          )
-            ? { ...supplier, syncStatus: "synced" }
-            : supplier,
-        ),
-        plots: state.plots.map((plot) =>
-          acceptedEntities.some(
+          );
+          if (!operation) return supplier;
+          const remote = appliedByOperation.get(operation.id);
+          return {
+            ...(remote && !("farmName" in remote) ? remote : supplier),
+            syncStatus: "synced",
+          };
+        }),
+        plots: state.plots.map((plot) => {
+          const operation = acceptedEntities.find(
             (item) => item.entityType === "plot" && item.entityId === plot.id,
-          )
-            ? { ...plot, syncStatus: "synced" }
-            : plot,
-        ),
+          );
+          if (!operation) return plot;
+          const remote = appliedByOperation.get(operation.id);
+          return {
+            ...(remote && "farmName" in remote ? remote : plot),
+            syncStatus: "synced",
+          };
+        }),
         outbox: state.outbox.filter(
           (item) => !accepted.has(item.id) && !conflictIds.has(item.id),
         ),

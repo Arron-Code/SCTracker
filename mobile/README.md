@@ -6,7 +6,10 @@ Expo/React-Native-App für Android und iOS mit vollständiger Oberfläche in Deu
 
 - Offline-fähige Lieferanten- und Kaffee-Plot-Erfassung
 - echte GeoJSON-Polygone durch mehrere GPS-Punkte sowie JSON-Import und -Bearbeitung
+- eigenständige Geofencing-Funktion mit GPS-, Lieferanten- und manueller Land-/Region-Ermittlung
+- editierbarer Kreismittelpunkt und Radius, aus der Plotfläche berechnete Startgröße sowie Hintergrund-Ein-/Austrittsüberwachung
 - persistente, migrationsfähige AsyncStorage-Daten (`v1`-GPS-Entwürfe werden nach `v2` migriert)
+- organisationsgetrennte Offline-Daten und Geofence-Registrierungen
 - retry-sichere Push/Pull-Synchronisierung mit UUID-/Idempotency-IDs, Outbox, Inbox-Cursor und sichtbarer Konfliktauflösung
 - Dokument-Upload über Presigned-URL-Initiierung und Abschluss
 - Satellitenanalyse, Evidence-Pack-Anforderung mit Download/Teilen sowie DDS-Entwurf, Validierung, Einreichung und Status
@@ -53,6 +56,7 @@ Verwendete Endpunkte:
 
 - `POST /api/v1/sync/push`
 - `GET /api/v1/sync/pull?cursor=...`
+- `POST /api/v1/plots/:id/geofence/check`
 - `POST /api/v1/documents/uploads`
 - `POST /api/v1/documents/uploads/:id/complete`
 - `POST|GET /api/v1/satellite/analyses[/:id]`
@@ -67,6 +71,12 @@ Verwendete Endpunkte:
 npm install
 npm start
 ```
+
+Für Hintergrund-Geofencing wird ein nativer Development- oder
+Produktions-Build benötigt. Die App fordert Vordergrund- und
+Hintergrund-Standortberechtigungen an und sendet lokale Benachrichtigungen beim
+Betreten oder Verlassen gespeicherter Plot-Regionen. Expo Go unterstützt dieses
+native Hintergrundverhalten nicht vollständig.
 
 ## Prüfungen
 

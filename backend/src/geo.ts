@@ -14,6 +14,29 @@ const multiPolygon = z.object({
 });
 export const geometrySchema = z.discriminatedUnion("type", [point, polygon, multiPolygon]);
 export type Geometry = z.infer<typeof geometrySchema>;
+export const geofenceSchema = z.object({
+  center: position,
+  radiusMeters: z.number().min(1).max(1_000_000),
+  source: z.enum(["gps", "supplier", "manual"]),
+  country: z.string().trim().min(1).max(100).optional(),
+  region: z.string().trim().min(1).max(200).optional(),
+  enabled: z.boolean(),
+  updatedAt: z.string().datetime(),
+});
+export type Geofence = z.infer<typeof geofenceSchema>;
+
+const EARTH_RADIUS_METERS = 6_371_000;
+
+export function geofenceDistanceMeters(geofence: Geofence, coordinates: [number, number]): number {
+  const latitude1 = (geofence.center[1] * Math.PI) / 180;
+  const latitude2 = (coordinates[1] * Math.PI) / 180;
+  const latitudeDelta = ((coordinates[1] - geofence.center[1]) * Math.PI) / 180;
+  const longitudeDelta = ((coordinates[0] - geofence.center[0]) * Math.PI) / 180;
+  const a =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(latitude1) * Math.cos(latitude2) * Math.sin(longitudeDelta / 2) ** 2;
+  return EARTH_RADIUS_METERS * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 function closeRing(input: [number, number][]): [number, number][] {
   const first = input[0];

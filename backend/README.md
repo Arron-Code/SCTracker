@@ -52,7 +52,13 @@ Successful responses use `{ "data": ..., "meta": ... }`; failures use
 `npm run migrate` applies only pending, forward-only SQL migrations in a transaction. It never
 drops application tables or resets a remote database. The initial migration enables PostGIS,
 stores normalized plot geometry in SRID 4326, creates quantitative lineage tables, and includes
-tenant columns and indexes suitable for subsequent RLS policy activation.
+tenant columns and indexes suitable for subsequent RLS policy activation. Migration `002` adds
+indexed geofence centers and radii derived from the canonical plot payload.
+
+Saved plot geofences are tenant-scoped and returned with normal plot reads and
+sync pulls. `POST /api/v1/plots/:id/geofence/check` accepts
+`{ "coordinates": [longitude, latitude] }` and reports the distance and whether
+the point is inside the enabled circular geofence.
 
 Demo data is never inserted by migration. It requires the explicit development-only command:
 

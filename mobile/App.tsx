@@ -48,6 +48,7 @@ import {
   createUuid,
   parsePolygon,
   type GeoJsonPolygon,
+  type Geofence,
   type OperationalRequest,
   type PersistedState,
   type Plot,
@@ -55,6 +56,13 @@ import {
   type Supplier,
   type SyncConflict,
 } from "./src/domain";
+import { GeofenceEditor } from "./src/GeofenceEditor";
+import {
+  centerOfPositions,
+  circleToPolygon,
+  radiusFromHectares,
+} from "./src/geofence";
+import { synchronizeGeofencing } from "./src/geofencing-task";
 import {
   isLanguage,
   languages,
@@ -62,7 +70,7 @@ import {
   type Language,
   type Translation,
 } from "./src/i18n";
-import { LANGUAGE_STORAGE_KEY, loadState, saveState } from "./src/storage";
+import { emptyState, LANGUAGE_STORAGE_KEY, loadState, saveState } from "./src/storage";
 import { synchronize } from "./src/sync";
 
 type Tab = "home" | "suppliers" | "plots" | "operations" | "help";
@@ -230,10 +238,11 @@ function SuppliersScreen({
   t: Translation;
 }) {
   const [name, setName] = useState("");
+  const [country, setCountry] = useState("");
   const [region, setRegion] = useState("");
 
   function addSupplier() {
-    if (!name.trim() || !region.trim()) {
+    if (!name.trim() || !country.trim() || !region.trim()) {
       Alert.alert(t.alerts.required);
       return;
     }
@@ -241,6 +250,7 @@ function SuppliersScreen({
     const supplier: Supplier = {
       id: createUuid(),
       name: name.trim(),
+      country: country.trim(),
       region: region.trim(),
       producerCount: 0,
       plotCount: 0,
@@ -265,6 +275,7 @@ function SuppliersScreen({
       ],
     }));
     setName("");
+    setCountry("");
     setRegion("");
     Alert.alert(t.alerts.saved);
   }
@@ -274,6 +285,7 @@ function SuppliersScreen({
       <Section title={t.suppliers.title} description={t.suppliers.description} />
       <View style={styles.card}>
         <Field label={t.common.name} value={name} onChangeText={setName} />
+        <Field label={t.common.country} value={country} onChangeText={setCountry} />
         <Field label={t.common.region} value={region} onChangeText={setRegion} />
         <Button label={t.suppliers.add} icon="person-add" onPress={addSupplier} />
       </View>
@@ -283,7 +295,7 @@ function SuppliersScreen({
           <View style={styles.rowBetween}>
             <View style={styles.flex}>
               <Text style={styles.cardTitle}>{supplier.name}</Text>
-              <Text style={styles.caption}>{supplier.region} · {supplier.id}</Text>
+              <Text style={styles.caption}>{supplier.country} · {supplier.region} · {supplier.id}</Text>
             </View>
             <Badge status={supplier.syncStatus} t={t} />
           </View>
@@ -310,15 +322,159 @@ function PlotsScreen({
   const [area, setArea] = useState("");
   const [supplierId, setSupplierId] = useState("");
   const [points, setPoints] = useState<Position[]>([]);
+  const [gpsPoints, setGpsPoints] = useState<Position[]>([]);
   const [geoJsonText, setGeoJsonText] = useState("");
   const [polygon, setPolygon] = useState<GeoJsonPolygon | null>(null);
+  const [geofence, setGeofence] = useState<Geofence | null>(null);
+  const [editorGeofence, setEditorGeofence] = useState<Geofence | null>(null);
+  const [geofenceOpen, setGeofenceOpen] = useState(false);
+  const [editingPlotId, setEditingPlotId] = useState<string | null>(null);
+  const [fallbackOpen, setFallbackOpen] = useState(false);
+  const [fallbackCountry, setFallbackCountry] = useState("");
+  const [fallbackRegion, setFallbackRegion] = useState("");
+  const [geocoding, setGeocoding] = useState(false);
   const [locating, setLocating] = useState(false);
+
+  function parsedArea(): number | null {
+    const value = Number(area.replace(",", "."));
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }
+
+  function createGeofence(
+    center: Position,
+    source: Geofence["source"],
+    country?: string,
+    region?: string,
+  ): Geofence {
+    const areaValue = parsedArea();
+    if (!areaValue) throw new Error("Plot area is invalid.");
+    return {
+      center,
+      radiusMeters: radiusFromHectares(areaValue),
+      source,
+      country,
+      region,
+      enabled: true,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  function openEditor(value: Geofence, plotId: string | null = null) {
+    setEditingPlotId(plotId);
+    setEditorGeofence(value);
+    setGeofenceOpen(true);
+  }
+
+  async function geocodeAndOpen(country: string, region: string, source: Geofence["source"]) {
+    setGeocoding(true);
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== "granted") {
+        Alert.alert(t.plots.permissionError);
+        return;
+      }
+      const matches = await Location.geocodeAsync(`${region.trim()}, ${country.trim()}`);
+      const match = matches[0];
+      if (!match) {
+        Alert.alert(t.geofencing.locationNotFound);
+        return;
+      }
+      openEditor(createGeofence([match.longitude, match.latitude], source, country.trim(), region.trim()));
+      setFallbackOpen(false);
+    } catch {
+      Alert.alert(t.geofencing.locationNotFound);
+    } finally {
+      setGeocoding(false);
+    }
+  }
+
+  async function configureDraftGeofence() {
+    if (!producer.trim() || !farm.trim() || !parsedArea()) {
+      Alert.alert(t.alerts.required);
+      return;
+    }
+    if (gpsPoints.length >= 3) {
+      openEditor(createGeofence(centerOfPositions(gpsPoints.slice(0, 3)), "gps"));
+      return;
+    }
+    const supplier = state.suppliers.find((item) => item.id === supplierId.trim());
+    if (supplier?.country.trim() && supplier.region.trim()) {
+      await geocodeAndOpen(supplier.country, supplier.region, "supplier");
+      return;
+    }
+    setFallbackCountry(supplier?.country ?? "");
+    setFallbackRegion(supplier?.region ?? "");
+    setFallbackOpen(true);
+  }
+
+  function openStoredGeofence(plot: Plot) {
+    const value =
+      plot.geofence ??
+      ({
+        center: centerOfPositions(plot.polygon.coordinates[0]),
+        radiusMeters: radiusFromHectares(Number(plot.areaHa)),
+        source: "gps",
+        enabled: true,
+        updatedAt: new Date().toISOString(),
+      } satisfies Geofence);
+    openEditor(value, plot.id);
+  }
+
+  function saveGeofence(next: Geofence) {
+    setGeofenceOpen(false);
+    if (!editingPlotId) {
+      setGeofence(next);
+      if (!polygon) {
+        const nextPolygon = circleToPolygon(next.center, next.radiusMeters);
+        setPolygon(nextPolygon);
+        setGeoJsonText(JSON.stringify(nextPolygon, null, 2));
+      }
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const plot = state.plots.find((item) => item.id === editingPlotId);
+    if (!plot) {
+      Alert.alert(t.geofencing.plotNotFound);
+      return;
+    }
+    const updatedPlot: Plot = {
+      ...plot,
+      geofence: next,
+      updatedAt: now,
+      syncStatus: "pending",
+    };
+    const updatedPlots = state.plots.map((item) => item.id === plot.id ? updatedPlot : item);
+    update((current) => ({
+      ...current,
+      plots: updatedPlots,
+      outbox: [
+        ...current.outbox.filter(
+          (item) => item.entityType !== "plot" || item.entityId !== plot.id,
+        ),
+        {
+          id: createUuid(),
+          idempotencyKey: createUuid(),
+          entityType: "plot",
+          entityId: plot.id,
+          action: "upsert",
+          payload: updatedPlot,
+          expectedUpdatedAt: plot.updatedAt,
+          createdAt: now,
+          attempts: 0,
+        },
+      ],
+    }));
+    setEditingPlotId(null);
+    Alert.alert(t.geofencing.saved);
+  }
 
   function applyPolygonText(value = geoJsonText) {
     try {
       const next = parsePolygon(value);
       setPolygon(next);
       setPoints(next.coordinates[0].slice(0, -1));
+      setGpsPoints([]);
       setGeoJsonText(JSON.stringify(next, null, 2));
     } catch {
       Alert.alert(t.plots.invalidPolygon);
@@ -335,9 +491,10 @@ function PlotsScreen({
       }
       const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       const next: Position[] = [
-        ...points,
+        ...gpsPoints,
         [location.coords.longitude, location.coords.latitude],
       ];
+      setGpsPoints(next);
       setPoints(next);
       if (next.length >= 3) {
         const nextPolygon = closePolygon(next);
@@ -371,8 +528,8 @@ function PlotsScreen({
       Alert.alert(t.alerts.required);
       return;
     }
-    const parsedArea = Number(area.replace(",", "."));
-    if (!Number.isFinite(parsedArea) || parsedArea <= 0) {
+    const areaValue = parsedArea();
+    if (!areaValue) {
       Alert.alert(t.plots.invalidPolygon);
       return;
     }
@@ -382,8 +539,9 @@ function PlotsScreen({
       supplierId: supplierId.trim() || undefined,
       producer: producer.trim(),
       farmName: farm.trim(),
-      areaHa: parsedArea.toFixed(2),
+      areaHa: areaValue.toFixed(2),
       polygon,
+      ...(geofence ? { geofence } : {}),
       capturedAt: now,
       updatedAt: now,
       syncStatus: "pending",
@@ -410,7 +568,9 @@ function PlotsScreen({
     setArea("");
     setSupplierId("");
     setPoints([]);
+    setGpsPoints([]);
     setPolygon(null);
+    setGeofence(null);
     setGeoJsonText("");
     Alert.alert(t.alerts.saved);
   }
@@ -440,6 +600,18 @@ function PlotsScreen({
           placeholder='{"type":"Polygon","coordinates":[...]}'
         />
         <Button label={t.plots.applyGeoJson} icon="checkmark-circle" onPress={() => applyPolygonText()} secondary />
+        <Button
+          label={t.geofencing.configure}
+          icon="navigate-circle"
+          onPress={() => void configureDraftGeofence()}
+          secondary
+          disabled={!producer.trim() || !farm.trim() || !parsedArea()}
+        />
+        {geofence ? (
+          <Text style={styles.caption}>
+            {t.geofencing.radius}: {Math.round(geofence.radiusMeters)} m
+          </Text>
+        ) : null}
         <Button label={t.plots.saveDraft} icon="save" onPress={savePlot} />
       </View>
       {state.plots.length === 0 ? <Text style={styles.empty}>{t.plots.empty}</Text> : null}
@@ -452,9 +624,51 @@ function PlotsScreen({
             </View>
             <Badge status={plot.syncStatus} t={t} />
           </View>
+          <Button
+            label={t.geofencing.open}
+            icon="navigate-circle"
+            onPress={() => openStoredGeofence(plot)}
+            secondary
+          />
           <Text style={styles.mono}>{JSON.stringify(plot.polygon)}</Text>
         </View>
       ))}
+      <Modal visible={fallbackOpen} transparent animationType="fade" onRequestClose={() => setFallbackOpen(false)}>
+        <View style={styles.modal}>
+          <View style={styles.dialog}>
+            <Text style={styles.cardTitle}>{t.geofencing.locationRequired}</Text>
+            <Text style={styles.description}>{t.geofencing.locationRequiredDetail}</Text>
+            <Field label={t.common.country} value={fallbackCountry} onChangeText={setFallbackCountry} />
+            <Field label={t.common.region} value={fallbackRegion} onChangeText={setFallbackRegion} />
+            <View style={styles.buttonRow}>
+              <Button label={t.close} icon="close" onPress={() => setFallbackOpen(false)} secondary />
+              <Button
+                label={geocoding ? t.geofencing.locating : t.geofencing.useLocation}
+                icon="search"
+                onPress={() => void geocodeAndOpen(fallbackCountry, fallbackRegion, "manual")}
+                disabled={geocoding || !fallbackCountry.trim() || !fallbackRegion.trim()}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+      <GeofenceEditor
+        visible={geofenceOpen}
+        value={editorGeofence}
+        labels={{
+          title: t.geofencing.title,
+          centerHint: t.geofencing.centerHint,
+          radius: t.geofencing.radius,
+          save: t.common.save,
+          cancel: t.close,
+        }}
+        onSave={saveGeofence}
+        onClose={() => {
+          setGeofenceOpen(false);
+          setEditorGeofence(null);
+          setEditingPlotId(null);
+        }}
+      />
     </>
   );
 }
@@ -859,9 +1073,12 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(authConfigured);
   const [authError, setAuthError] = useState<string | null>(null);
   const persistReady = useRef(false);
+  const stateScope = useRef("local");
+  const monitoredGeofences = useRef("");
   const t = translations[language];
   const configured = getApiBaseUrl() !== null;
   const authorized = Boolean(authSession?.session.activeOrganizationId);
+  const activeScope = authSession?.session.activeOrganizationId ?? "local";
 
   async function refreshAuth() {
     if (!authConfigured) {
@@ -885,7 +1102,7 @@ export default function App() {
 
   useEffect(() => {
     let active = true;
-    void Promise.all([AsyncStorage.getItem(LANGUAGE_STORAGE_KEY), loadState()])
+    void Promise.all([AsyncStorage.getItem(LANGUAGE_STORAGE_KEY), loadState("local")])
       .then(([storedLanguage, storedState]) => {
         if (!active) return;
         if (isLanguage(storedLanguage)) setLanguage(storedLanguage);
@@ -908,8 +1125,64 @@ export default function App() {
 
   useEffect(() => {
     if (!state || !persistReady.current) return;
-    void saveState(state).catch(() => Alert.alert(t.alerts.storageError));
+    void saveState(state, stateScope.current).catch(() => Alert.alert(t.alerts.storageError));
   }, [state, t.alerts.storageError]);
+
+  useEffect(() => {
+    if (!state || activeScope === stateScope.current) return;
+    let active = true;
+    persistReady.current = false;
+    const previousScope = stateScope.current;
+    const previousState = state;
+    void (async () => {
+      await synchronizeGeofencing([]).catch((error) => {
+        console.error("Could not stop geofencing during organization switch", error);
+        Alert.alert(t.geofencing.backgroundPermissionError);
+      });
+      await saveState(previousState, previousScope);
+      let nextState = await loadState(activeScope);
+      const previousHasOfflineWork =
+        previousState.suppliers.length > 0 ||
+        previousState.plots.length > 0 ||
+        previousState.outbox.length > 0;
+      const nextIsEmpty =
+        nextState.suppliers.length === 0 &&
+        nextState.plots.length === 0 &&
+        nextState.outbox.length === 0;
+      if (previousScope === "local" && activeScope !== "local" && previousHasOfflineWork && nextIsEmpty) {
+        nextState = { ...previousState, cursor: null, lastSyncAt: null };
+        await saveState(nextState, activeScope);
+        await saveState(emptyState(), "local");
+      }
+      if (!active) return;
+      stateScope.current = activeScope;
+      monitoredGeofences.current = "";
+      setState(nextState);
+      persistReady.current = true;
+    })().catch(() => {
+      if (!active) return;
+      persistReady.current = true;
+      Alert.alert(t.alerts.storageError);
+    });
+    return () => {
+      active = false;
+    };
+  }, [activeScope, state, t.alerts.storageError]);
+
+  useEffect(() => {
+    if (!state || !persistReady.current) return;
+    const signature = state.plots
+      .filter((plot) => plot.geofence?.enabled)
+      .map((plot) => `${plot.id}:${plot.geofence!.center.join(",")}:${plot.geofence!.radiusMeters}`)
+      .sort()
+      .join("|");
+    if (signature === monitoredGeofences.current) return;
+    monitoredGeofences.current = signature;
+    void synchronizeGeofencing(state.plots).catch(() => {
+      monitoredGeofences.current = "";
+      Alert.alert(t.geofencing.backgroundPermissionError);
+    });
+  }, [state, t.geofencing.backgroundPermissionError]);
 
   function update(recipe: (current: PersistedState) => PersistedState) {
     setState((current) => current ? recipe(current) : current);
@@ -953,7 +1226,8 @@ export default function App() {
           suppliers: current.suppliers.map((item) => item.id === supplier.id ? supplier : item),
           outbox: choice === "local" ? [...remainingOutbox, {
             id: createUuid(), idempotencyKey: createUuid(), entityType: "supplier" as const,
-            entityId: supplier.id, action: "upsert" as const, payload: supplier, createdAt: now, attempts: 0,
+            entityId: supplier.id, action: "upsert" as const, payload: supplier,
+            expectedUpdatedAt: conflict.remote.updatedAt, createdAt: now, attempts: 0,
           }] : remainingOutbox,
         };
       }
@@ -963,7 +1237,8 @@ export default function App() {
         plots: current.plots.map((item) => item.id === plot.id ? plot : item),
         outbox: choice === "local" ? [...remainingOutbox, {
           id: createUuid(), idempotencyKey: createUuid(), entityType: "plot" as const,
-          entityId: plot.id, action: "upsert" as const, payload: plot, createdAt: now, attempts: 0,
+          entityId: plot.id, action: "upsert" as const, payload: plot,
+          expectedUpdatedAt: conflict.remote.updatedAt, createdAt: now, attempts: 0,
         }] : remainingOutbox,
       };
     });
