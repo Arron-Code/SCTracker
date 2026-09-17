@@ -135,6 +135,9 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   });
   installErrorHandler(app);
 
+  app.get("/", { schema: { tags: ["system"], security: [] } }, async (_request, reply) =>
+    reply.redirect("/docs/"),
+  );
   app.get("/health", { schema: { tags: ["system"], security: [] } }, async () =>
     data({ status: "ok", version: process.env.npm_package_version ?? "0.1.0" }),
   );

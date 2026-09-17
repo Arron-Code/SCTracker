@@ -81,6 +81,14 @@ describe("SCTracker API", () => {
     await app.close();
   }, 15_000);
 
+  it("redirects the backend root to the API documentation", async () => {
+    const app = await buildApp({ config, repository, providers });
+    const response = await app.inject({ method: "GET", url: "/" });
+    expect(response.statusCode).toBe(302);
+    expect(response.headers.location).toBe("/docs/");
+    await app.close();
+  });
+
   it("allows configured frontend origins without opening CORS to arbitrary sites", async () => {
     const app = await buildApp({ config, repository, providers });
     const allowed = await app.inject({
