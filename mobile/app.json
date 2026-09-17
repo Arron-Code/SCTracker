@@ -22,9 +22,9 @@
     "android": {
       "package": "com.sctracker.coffee",
       "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION"
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#14251D",
@@ -43,6 +43,12 @@
       "expo-notifications",
       "expo-sharing",
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "5666ba51-fa2a-4a5e-b874-b6bc6da22413"
+      }
+    },
+    "owner": "ajohannes"
   }
 }

@@ -5,13 +5,25 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://backend-meloy.vercel.app",
+        "EXPO_PUBLIC_NEON_AUTH_URL": "https://ep-weathered-boat-b1i5bn4m.neonauth.c-5.eu-central-1.aws.neon.tech/sctracker/auth"
+      }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://backend-meloy.vercel.app",
+        "EXPO_PUBLIC_NEON_AUTH_URL": "https://ep-weathered-boat-b1i5bn4m.neonauth.c-5.eu-central-1.aws.neon.tech/sctracker/auth"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://backend-meloy.vercel.app",
+        "EXPO_PUBLIC_NEON_AUTH_URL": "https://ep-weathered-boat-b1i5bn4m.neonauth.c-5.eu-central-1.aws.neon.tech/sctracker/auth"
+      }
     }
   }
 }
