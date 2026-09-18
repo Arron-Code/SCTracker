@@ -45,8 +45,10 @@ Datenbank-Zugangsdaten und andere Server-Secrets dürfen nicht in Expo-Variablen
 stehen. Für ein physisches Gerät muss die API-URL vom Gerät erreichbar sein;
 `localhost` verweist dort auf das Gerät selbst.
 
-Die App bietet Anmeldung, Registrierung, Abmeldung und
-Organisationserstellung/-auswahl in Deutsch, Englisch, Amharisch und Tigrinya.
+Die App bietet Anmeldung, Abmeldung und Organisationserstellung/-auswahl in
+Deutsch, Englisch, Amharisch und Tigrinya. Benutzerkonten werden für diese
+B2B-App administrativ bereitgestellt; eine öffentliche Selbstregistrierung ist
+nicht verfügbar.
 Das Better-Auth-Expo-Plugin speichert Session-Cookies in `expo-secure-store`.
 Kurzlebige JWTs werden mit `token()` je API-Aufruf neu bezogen und nie in
 AsyncStorage oder localStorage gespeichert.
@@ -96,4 +98,109 @@ npm run export:android
 npm run export:ios
 ```
 
-Für signierte Builds werden weiterhin Expo Application Services sowie die jeweiligen Apple-/Google-Entwicklerkonten benötigt.
+## Veröffentlichung im Apple App Store
+
+Die iOS-App verwendet die Bundle-ID `com.sctracker.coffee`, verwaltet die
+Build-Nummer über EAS (`appVersionSource: remote`) und erhöht sie bei jedem
+Produktions-Build automatisch. Das Privacy Manifest enthält die von den
+eingebundenen Expo-/React-Native-Modulen deklarierten Required-Reason-APIs.
+
+Voraussetzungen:
+
+1. Ein kostenpflichtiges Apple-Developer-Konto und Zugriff auf den Expo-Owner
+   `ajohannes`.
+2. Eine App in App Store Connect mit der Bundle-ID
+   `com.sctracker.coffee`.
+3. Öffentliche E-Mail-Registrierung in der Neon-Auth-Konfiguration der
+   Produktions-Branch deaktivieren und danach prüfen, dass
+   `auth_methods.email_password.allow_sign_up` den Wert `false` hat. Die
+   Mobile-App selbst enthält bereits keinen Registrierungsablauf mehr.
+4. Datenschutz- und Support-URLs sowie App-Store-Texte und Screenshots für alle
+   unterstützten Gerätegrößen.
+5. Vollständig beantwortete App-Privacy-Angaben. Nach dem aktuellen
+   Funktionsumfang sind insbesondere Konto-/E-Mail-Daten, Gerätekennungen,
+   präzise Standortdaten, Lieferanten-/Betriebsdaten und hochgeladene Dokumente
+   mit Backend und Datenschutzverantwortlichen abzugleichen. Die App verwendet
+   diese Daten für ihre Funktion und deklariert kein Tracking.
+6. Ein dokumentierter administrativer Prozess für Kontosperrung,
+   Löschanfragen und gesetzliche Aufbewahrungspflichten. Die App bietet keine
+   Selbstregistrierung.
+
+Vor dem ersten Upload die Apple-ID der App aus **App Store Connect > App
+Information > General Information** als `ascAppId` unter
+`submit.production.ios` in `eas.json` ergänzen. Anschließend:
+
+```powershell
+npx eas-cli login
+npx eas-cli credentials --platform ios
+npm test
+npm run typecheck
+npx expo-doctor
+npm run export:ios
+npm run release:ios:build
+npm run release:ios:submit
+```
+
+Der Submit lädt den Build zunächst zu App Store Connect/TestFlight hoch. Die
+Freigabe für App Review, Altersfreigabe, Export-Compliance, Preis,
+Verfügbarkeit, Datenschutzangaben, Review-Kontakt und gegebenenfalls ein
+Review-Testkonto werden anschließend in App Store Connect gepflegt.
+
+Für signierte Builds werden Expo Application Services sowie das
+Apple-Entwicklerkonto benötigt.
+
+## Veröffentlichung im Google Play Store
+
+Die Android-App verwendet die unveränderliche Paket-ID
+`com.sctracker.coffee`. Das EAS-Produktionsprofil erzeugt ein Android App
+Bundle (`.aab`) und erhöht den `versionCode` über die remote verwaltete
+EAS-Version automatisch. Der Submit lädt neue Builds zunächst als Entwurf in
+den internen Test-Track; eine unbeabsichtigte Produktionsfreigabe findet nicht
+statt.
+
+Voraussetzungen:
+
+1. Ein vollständig registriertes Google-Play-Developer-Konto.
+2. Eine App in der Google Play Console mit der Paket-ID
+   `com.sctracker.coffee`. Diese ID kann nach dem ersten Upload nicht mehr
+   geändert werden.
+3. Die Play Integrity API für das Google-Cloud-Projekt mit der Projektnummer
+   `1070814792378` aktivieren und dieses Projekt in der Play Console verknüpfen.
+   Das EAS-Produktionsprofil übergibt die Nummer bereits an die App.
+4. Den produktiven Backend-Verifier mit `PLAY_INTEGRITY_VERIFY_URL` und
+   `PLAY_INTEGRITY_VERIFY_TOKEN` konfigurieren. Ohne diesen Adapter meldet die
+   Geräteattestierung ausdrücklich `NOT_CONFIGURED`.
+5. Einen Google-Service-Account für die Google Play Android Developer API
+   anlegen, in der Play Console mindestens für interne Releases berechtigen und
+   den JSON-Schlüssel über `eas credentials --platform android` zu EAS
+   hochladen. Der Schlüssel darf nicht in Git gespeichert werden.
+6. Store Listing, App-Symbol, Feature Graphic, Telefon-/Tablet-Screenshots,
+   Support- und Datenschutz-URL, Zielgruppe, Inhaltsbewertung und
+   Werbeangaben vollständig pflegen.
+7. Das Formular **Data safety** mit Backend und Datenschutzverantwortlichen
+   abstimmen. Insbesondere Konto-/E-Mail-Daten, Gerätekennungen, präzise
+   Standortdaten, Lieferanten-/Betriebsdaten und Dokumente sind entsprechend
+   ihrer tatsächlichen Erhebung, Übertragung, Verschlüsselung und
+   Löschmöglichkeit anzugeben.
+8. Die Hintergrundstandortberechtigung in der Play Console begründen und ein
+   Demonstrationsvideo bereitstellen. Die App benötigt sie ausschließlich für
+   vom Benutzer aktivierte Kaffee-Plot-Geofences und lokale Ein-/Austritts-
+   Benachrichtigungen.
+
+Vor dem Upload:
+
+```powershell
+npx eas-cli login
+npx eas-cli credentials --platform android
+npm test
+npm run typecheck
+npx expo-doctor
+npm run export:android
+npm run release:android:build
+npm run release:android:submit
+```
+
+Nach dem Draft-Upload wird der Release in der Google Play Console geprüft,
+vervollständigt und zuerst an interne Tester verteilt. Erst nach erfolgreichem
+Test und abgeschlossener Richtlinienprüfung sollte er in einen Produktions-
+Release übernommen werden.

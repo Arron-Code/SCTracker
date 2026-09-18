@@ -66,13 +66,6 @@ export async function signIn(email: string, password: string) {
   );
 }
 
-export async function signUp(name: string, email: string, password: string) {
-  return unwrap(
-    await requireClient().signUp.email({ name, email, password }),
-    "Sign-up failed.",
-  );
-}
-
 export async function signOut() {
   return unwrap(await requireClient().signOut(), "Sign-out failed.");
 }

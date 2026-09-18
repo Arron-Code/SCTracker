@@ -42,7 +42,6 @@ import {
   setActiveOrganization,
   signIn,
   signOut,
-  signUp,
 } from "./src/auth";
 import type { AuthOrganization, AuthSession } from "./src/auth-core";
 import {
@@ -955,8 +954,6 @@ function AuthCard({
   refresh: () => Promise<void>;
   t: Translation;
 }) {
-  const [mode, setMode] = useState<"signIn" | "signUp">("signIn");
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [organizationName, setOrganizationName] = useState("");
@@ -996,25 +993,16 @@ function AuthCard({
   if (!session) {
     return (
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>{mode === "signIn" ? t.auth.signIn : t.auth.signUp}</Text>
-        {mode === "signUp" ? <Field label={t.common.name} value={name} onChangeText={setName} /> : null}
+        <Text style={styles.cardTitle}>{t.auth.signIn}</Text>
+        <Text style={styles.description}>{t.auth.accountProvided}</Text>
         <Field label={t.auth.email} value={email} onChangeText={setEmail} />
         <Field label={t.auth.password} value={password} onChangeText={setPassword} secureTextEntry />
         {actionError ?? error ? <Text style={styles.errorText}>{actionError ?? error}</Text> : null}
         <Button
-          label={mode === "signIn" ? t.auth.signIn : t.auth.signUp}
-          icon={mode === "signIn" ? "log-in" : "person-add"}
+          label={t.auth.signIn}
+          icon="log-in"
           disabled={submitting}
-          onPress={() => void run(() => mode === "signIn"
-            ? signIn(email.trim(), password)
-            : signUp(name.trim(), email.trim(), password))}
-        />
-        <Button
-          label={mode === "signIn" ? t.auth.needAccount : t.auth.haveAccount}
-          icon="swap-horizontal"
-          secondary
-          disabled={submitting}
-          onPress={() => setMode(mode === "signIn" ? "signUp" : "signIn")}
+          onPress={() => void run(() => signIn(email.trim(), password))}
         />
       </View>
     );

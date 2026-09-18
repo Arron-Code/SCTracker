@@ -109,10 +109,8 @@ export type Translation = {
   alerts: { required: string; saved: string; storageError: string };
   auth: {
     signIn: string;
-    signUp: string;
     signOut: string;
-    needAccount: string;
-    haveAccount: string;
+    accountProvided: string;
     email: string;
     password: string;
     organization: string;
@@ -188,8 +186,8 @@ export const translations = {
     },
     alerts: { required: "Bitte alle erforderlichen Felder ausfüllen.", saved: "Offline gespeichert.", storageError: "Lokale Daten konnten nicht sicher gespeichert werden." },
     auth: {
-      signIn: "Anmelden", signUp: "Konto erstellen", signOut: "Abmelden",
-      needAccount: "Neues Konto erstellen", haveAccount: "Vorhandenes Konto verwenden",
+      signIn: "Anmelden", signOut: "Abmelden",
+      accountProvided: "Konten werden von Ihrer Organisation bereitgestellt.",
       email: "E-Mail", password: "Passwort", organization: "Aktive Organisation",
       organizationRequired: "Wählen oder erstellen Sie eine Organisation, bevor Sie synchronisieren.",
       organizationName: "Organisationsname", organizationSlug: "Organisationskürzel",
@@ -258,8 +256,8 @@ export const translations = {
     },
     alerts: { required: "Complete all required fields.", saved: "Saved offline.", storageError: "Local data could not be stored safely." },
     auth: {
-      signIn: "Sign in", signUp: "Create account", signOut: "Sign out",
-      needAccount: "Create a new account", haveAccount: "Use an existing account",
+      signIn: "Sign in", signOut: "Sign out",
+      accountProvided: "Accounts are provided by your organization.",
       email: "Email", password: "Password", organization: "Active organization",
       organizationRequired: "Select or create an organization before synchronizing.",
       organizationName: "Organization name", organizationSlug: "Organization slug",
@@ -328,8 +326,8 @@ export const translations = {
     },
     alerts: { required: "እባክዎ ሁሉንም አስፈላጊ መስኮች ይሙሉ።", saved: "ከመስመር ውጭ ተቀምጧል።", storageError: "የአካባቢ ውሂብ በደህንነት ሊቀመጥ አልቻለም።" },
     auth: {
-      signIn: "ግባ", signUp: "መለያ ፍጠር", signOut: "ውጣ",
-      needAccount: "አዲስ መለያ ፍጠር", haveAccount: "ያለውን መለያ ተጠቀም",
+      signIn: "ግባ", signOut: "ውጣ",
+      accountProvided: "መለያዎች በድርጅትዎ ይሰጣሉ።",
       email: "ኢሜይል", password: "የይለፍ ቃል", organization: "ንቁ ድርጅት",
       organizationRequired: "ከማመሳሰልዎ በፊት ድርጅት ይምረጡ ወይም ይፍጠሩ።",
       organizationName: "የድርጅት ስም", organizationSlug: "የድርጅት አጭር መለያ",
@@ -398,8 +396,8 @@ export const translations = {
     },
     alerts: { required: "በጃኹም ኩሎም ዘድልዩ ቦታታት ምልኡ።", saved: "ካብ መስመር ወጻኢ ተዓቂቡ።", storageError: "ናይ መሳርሒ ዳታ ብውሕስነት ክዕቀብ ኣይከኣለን።" },
     auth: {
-      signIn: "እቶ", signUp: "መለያ ፍጠር", signOut: "ውጻእ",
-      needAccount: "ሓድሽ መለያ ፍጠር", haveAccount: "ዘሎ መለያ ተጠቐም",
+      signIn: "እቶ", signOut: "ውጻእ",
+      accountProvided: "መለያታት ብትካልኩም ይወሃቡ።",
       email: "ኢመይል", password: "መሕለፊ ቓል", organization: "ንጡፍ ትካል",
       organizationRequired: "ቅድሚ ምትእስሳር ትካል ምረጹ ወይ ፍጠሩ።",
       organizationName: "ስም ትካል", organizationSlug: "ሓጺር መለለዪ ትካል",
