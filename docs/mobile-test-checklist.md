@@ -83,7 +83,11 @@ Auf dem iPhone kann die Berechtigung später unter Einstellungen, Datenschutz un
 
 Erwartetes Ergebnis: Der zuvor gespeicherte Entwurf ist weiterhin vorhanden.
 
-Die Entwürfe liegen aktuell ausschließlich im lokalen AsyncStorage des Geräts. Eine Deinstallation von Expo Go oder das Löschen der App-Daten kann diese Entwürfe entfernen.
+Die Entwürfe liegen als XChaCha20-Poly1305-verschlüsselter Container in
+AsyncStorage. Der installationsgebundene Schlüssel und die stabile Geräte-ID
+liegen im nativen Secure Store. Vorhandene Klartextdaten werden beim ersten
+Start migriert und anschließend entfernt. Eine Deinstallation oder das Löschen
+der App-Daten kann lokale Entwürfe weiterhin entfernen.
 
 ## 7. Offline-Verhalten testen
 

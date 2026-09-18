@@ -54,6 +54,9 @@ drops application tables or resets a remote database. The initial migration enab
 stores normalized plot geometry in SRID 4326, creates quantitative lineage tables, and includes
 tenant columns and indexes suitable for subsequent RLS policy activation. Migration `002` adds
 indexed geofence centers and radii derived from the canonical plot payload.
+Migration `003` stores tenant-, actor-, device-, and key-bound P-256 signed
+mobile events. Sequence and predecessor hashes are checked transactionally,
+and database triggers make accepted events append-only.
 
 Saved plot geofences are tenant-scoped and returned with normal plot reads and
 sync pulls. `POST /api/v1/plots/:id/geofence/check` accepts
@@ -77,6 +80,12 @@ External integrations never synthesize success. Missing Sentinel Hub, S3, or EU 
 System V3 Acceptance settings produce `NOT_CONFIGURED`. Evidence uploads persist expected
 SHA-256, size, and MIME metadata, verify the uploaded object, retain version IDs, and become
 immutable after completion.
+
+Supplier and plot mutations sent through the mobile sync format require a
+signed event. Legacy unsigned sync remains available only for shipment
+operations. The API verifies the canonical payload hash, event hash, P-256
+signature, authenticated tenant and actor, stable device binding, and
+contiguous chain head before applying mobile changes.
 
 ## S3 Object Lock
 

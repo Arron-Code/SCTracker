@@ -87,9 +87,13 @@ Set `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_NEON_AUTH_URL` in `mobile\.env`.
 These URLs are public configuration, not secrets. Native auth cookies are kept
 by the official Better Auth Expo plugin in `expo-secure-store`; raw JWTs are
 requested with `token()` for each API call and are never saved in AsyncStorage.
-Offline supplier and plot capture remains available while signed out or
-disconnected, and the existing outbox is retained until authenticated sync
-succeeds.
+Offline supplier, plot, geofence, outbox, and event-chain data is protected with
+XChaCha20-Poly1305; the installation key and stable device identity are held in
+`expo-secure-store`. Existing plaintext state is encrypted during first load.
+Document uploads and Evidence Pack downloads are encrypted on-device with a
+separately shared passphrase before transfer or sharing. Mobile mutations are
+bound to the authenticated tenant and actor in a P-256-signed hash chain that
+the backend verifies and stores append-only.
 
 Geofence centers are derived from three captured GPS positions. If they are
 missing, the app geocodes the selected supplier's country and region and then
