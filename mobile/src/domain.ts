@@ -62,6 +62,24 @@ export type OperationalRequest = {
   updatedAt: string;
 };
 
+export type SignedEvent = {
+  schema: 1;
+  eventId: string;
+  eventType: string;
+  aggregateId: string;
+  sequence: number;
+  prevHash: string;
+  reportedUtc: string;
+  deviceId: string;
+  actorId: string;
+  tenantId: string;
+  payloadHash: string;
+  eventHash: string;
+  keyId: string;
+  signature: string;
+  payload: Supplier | Plot;
+};
+
 export type OutboxOperation = {
   id: string;
   idempotencyKey: string;
@@ -74,6 +92,7 @@ export type OutboxOperation = {
   attempts: number;
   nextAttemptAt?: string;
   lastError?: string;
+  event?: SignedEvent;
 };
 
 export type SyncConflict = {
@@ -86,7 +105,7 @@ export type SyncConflict = {
 };
 
 export type PersistedState = {
-  version: 2;
+  version: 3;
   deviceId: string;
   cursor: string | null;
   suppliers: Supplier[];
@@ -94,6 +113,7 @@ export type PersistedState = {
   documents: DocumentRecord[];
   operations: OperationalRequest[];
   outbox: OutboxOperation[];
+  events: SignedEvent[];
   conflicts: SyncConflict[];
   lastSyncAt: string | null;
 };
@@ -110,6 +130,7 @@ export type LegacyPlotDraft = {
 
 export type PushResponse = {
   accepted: string[];
+  chainHead?: string;
   applied?: Array<{
     operationId?: string;
     resource: Supplier | Plot;

@@ -18,6 +18,13 @@ import {
   type StorageProvider,
 } from "./providers.js";
 import { PgRepository, type Change, type Repository, type ResourceType } from "./repository.js";
+import {
+  SIGNING_ALGORITHM,
+  sha256Hex,
+  signedEventHash,
+  verifySignedEvent,
+  type SignedEvent,
+} from "./signed-events.js";
 
 export interface Providers {
   storage: StorageProvider;
@@ -100,8 +107,33 @@ const mobileSyncOperation = z.object({
   action: z.literal("upsert"),
   payload: z.record(z.string(), z.unknown()),
   expectedUpdatedAt: z.string().datetime().optional(),
+  event: z.object({
+    schema: z.literal(1),
+    tenantId: uuid,
+    eventId: uuid,
+    eventType: z.string().min(1).max(200),
+    aggregateId: uuid,
+    sequence: z.number().int().positive(),
+    prevHash: z.string().regex(/^[0-9a-f]{64}$/),
+    reportedUtc: z.string().datetime(),
+    deviceId: uuid,
+    actorId: uuid,
+    payloadHash: z.string().regex(/^[0-9a-f]{64}$/),
+    keyId: z.string().min(1).max(200),
+    eventHash: z.string().regex(/^[0-9a-f]{64}$/),
+    signature: z.string().min(1),
+    payload: z.record(z.string(), z.unknown()),
+  }).optional(),
 });
 const syncOperation = z.union([legacySyncOperation, mobileSyncOperation]);
+const deviceSigningKey = z.object({
+  keyId: z.string().min(1).max(200),
+  algorithm: z.literal(SIGNING_ALGORITHM),
+  publicKeyBase64: z.string().refine((value) => {
+    const bytes = Buffer.from(value, "base64");
+    return bytes.length === 65 && bytes[0] === 4 && bytes.toString("base64") === value;
+  }, "Expected an uncompressed 65-byte SEC1 P-256 public key"),
+});
 
 function data<T>(value: T, meta?: Record<string, unknown>): { data: T; meta?: Record<string, unknown> } {
   return meta ? { data: value, meta } : { data: value };
@@ -112,24 +144,29 @@ function requireFound<T>(value: T | null, label: string): T {
   return value;
 }
 
+function mobileResource(resource: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(resource).filter(([key]) => key !== "tenantId"));
+}
+
 function mobileChange(change: Change) {
+  const payload = mobileResource(change.payload);
   if (change.resourceType === "suppliers") {
-    const country = change.payload.country ?? change.payload.countryCode ?? "";
+    const country = payload.country ?? payload.countryCode ?? "";
     return {
       entityType: "supplier" as const,
       entity: {
-        ...change.payload,
-        name: String(change.payload.name ?? ""),
+        ...payload,
+        name: String(payload.name ?? ""),
         country: String(country),
-        region: String(change.payload.region ?? ""),
-        producerCount: Number(change.payload.producerCount ?? 0),
-        plotCount: Number(change.payload.plotCount ?? 0),
+        region: String(payload.region ?? ""),
+        producerCount: Number(payload.producerCount ?? 0),
+        plotCount: Number(payload.plotCount ?? 0),
         syncStatus: "synced",
       },
     };
   }
   if (change.resourceType !== "plots") return null;
-  const polygon = change.payload.polygon ?? change.payload.geometry;
+  const polygon = payload.polygon ?? payload.geometry;
   if (
     !polygon ||
     typeof polygon !== "object" ||
@@ -138,14 +175,14 @@ function mobileChange(change: Change) {
   ) {
     return null;
   }
-  const nameValue = String(change.payload.name ?? "");
+  const nameValue = String(payload.name ?? "");
   return {
     entityType: "plot" as const,
     entity: {
-      ...change.payload,
-      producer: String(change.payload.producer ?? nameValue),
-      farmName: String(change.payload.farmName ?? nameValue),
-      areaHa: String(change.payload.areaHa ?? change.payload.areaHectares ?? "0"),
+      ...payload,
+      producer: String(payload.producer ?? nameValue),
+      farmName: String(payload.farmName ?? nameValue),
+      areaHa: String(payload.areaHa ?? payload.areaHectares ?? "0"),
       polygon,
       syncStatus: "synced",
     },
@@ -432,7 +469,66 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     }
     const replay = await options.repository.findIdempotency(request.actor.tenantId, idempotencyKey);
     if (replay) return data(replay, { replayed: true });
-    const body = z.object({ operations: z.array(syncOperation).min(1).max(100) }).parse(request.body);
+    const body = z.object({
+      deviceId: uuid.optional(),
+      deviceKey: deviceSigningKey.optional(),
+      operations: z.array(syncOperation).min(1).max(100),
+    }).parse(request.body);
+    const hasMobileOperations = body.operations.some((operation) => "entityType" in operation);
+    const hasProtectedLegacyOperations = body.operations.some((operation) =>
+      "resourceType" in operation &&
+      (operation.resourceType === "suppliers" || operation.resourceType === "plots")
+    );
+    if (hasProtectedLegacyOperations) {
+      throw new AppError(
+        "SIGNED_EVENT_REQUIRED",
+        "Supplier and plot sync operations must use the signed mobile format",
+        400,
+      );
+    }
+    if (hasMobileOperations && (!body.deviceId || !body.deviceKey)) {
+      throw new AppError(
+        "SIGNED_EVENT_REQUIRED",
+        "Mobile sync operations require deviceId, deviceKey, and a signed event",
+        400,
+      );
+    }
+    let signedChainHead: string | undefined;
+    if (body.deviceKey) {
+      if (!body.deviceId) {
+        throw new AppError("INVALID_SIGNED_EVENT", "deviceId is required with deviceKey", 400);
+      }
+      const events: SignedEvent[] = [];
+      for (const operation of body.operations) {
+        if (!("entityType" in operation) || !operation.event) {
+          throw new AppError("INVALID_SIGNED_EVENT", "Every signed operation must contain an event", 400);
+        }
+        const event = operation.event;
+        const payloadHash = sha256Hex(operation.payload);
+        if (
+          event.tenantId !== request.actor.tenantId ||
+          event.eventId !== operation.id ||
+          event.eventType !== `${operation.entityType}.${operation.action}` ||
+          event.aggregateId !== operation.entityId ||
+          event.deviceId !== body.deviceId ||
+          event.actorId !== request.actor.actorId ||
+          event.keyId !== body.deviceKey.keyId ||
+          event.payloadHash !== payloadHash ||
+          sha256Hex(event.payload) !== payloadHash ||
+          event.eventHash !== signedEventHash(event) ||
+          !verifySignedEvent(event, body.deviceKey)
+        ) {
+          throw new AppError("INVALID_SIGNED_EVENT", "Signed event validation failed", 400);
+        }
+        events.push(event);
+      }
+      await options.repository.appendSignedEvents(
+        request.actor.tenantId,
+        { ...body.deviceKey, deviceId: body.deviceId, actorId: request.actor.actorId },
+        events,
+      );
+      signedChainHead = events.at(-1)!.eventHash;
+    }
     const applied = [];
     const conflicts = [];
     const accepted: string[] = [];
@@ -467,7 +563,11 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
               request.actor.tenantId,
               mobile ? { ...operation.payload, id: targetId } : operation.payload,
             );
-        applied.push({ index, resource, ...mobile ? { operationId: operation.id } : {} });
+        applied.push({
+          index,
+          resource: mobileResource(resource),
+          ...mobile ? { operationId: operation.id } : {},
+        });
         if (mobile) accepted.push(operation.id);
       } catch (error) {
         if (error instanceof AppError && error.code === "SYNC_CONFLICT") {
@@ -495,6 +595,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       applied,
       conflicts,
       accepted,
+      ...(signedChainHead ? { chainHead: signedChainHead } : {}),
     };
     await options.repository.saveIdempotency(request.actor.tenantId, idempotencyKey, response);
     return data(response);

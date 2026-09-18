@@ -57,12 +57,15 @@ import {
   type SyncConflict,
 } from "./src/domain";
 import { GeofenceEditor } from "./src/GeofenceEditor";
+import { authActorId, authTenantId, sha256Base64 } from "./src/crypto-core";
+import { encryptExport } from "./src/encrypted-export";
 import {
   centerOfPositions,
   circleToPolygon,
   radiusFromHectares,
 } from "./src/geofence";
 import { synchronizeGeofencing } from "./src/geofencing-task";
+import { randomBytes } from "./src/secure-crypto";
 import {
   isLanguage,
   languages,
@@ -683,6 +686,7 @@ function OperationsScreen({
   t: Translation;
 }) {
   const [subjectId, setSubjectId] = useState("");
+  const [exportPassphrase, setExportPassphrase] = useState("");
   const configured = getApiBaseUrl() !== null;
 
   function providerError(error: unknown): string {
@@ -697,27 +701,46 @@ function OperationsScreen({
       Alert.alert(t.sync.notConfigured, t.operations.providerBlocked);
       return;
     }
+    if (exportPassphrase.normalize("NFKC").length < 12) {
+      Alert.alert(t.operations.encryptionRequired, t.operations.passphraseHint);
+      return;
+    }
     const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true });
     if (result.canceled) return;
     const asset = result.assets[0];
     const localId = createUuid();
+    const encryptedName = `${asset.name}.sctpkg`;
     update((current) => ({
       ...current,
       documents: [{
         id: localId,
-        fileName: asset.name,
-        mimeType: asset.mimeType ?? "application/octet-stream",
+        fileName: encryptedName,
+        mimeType: "application/vnd.sctracker.encrypted-package",
         size: asset.size ?? 0,
         status: "uploading",
         createdAt: new Date().toISOString(),
       }, ...current.documents],
     }));
+    let encryptedFile: File | null = null;
     try {
+      const source = new File(asset.uri);
+      const encrypted = await encryptExport(
+        await source.bytes(),
+        exportPassphrase,
+        randomBytes,
+        asset.name,
+        asset.mimeType ?? "application/octet-stream",
+      );
+      encryptedFile = new File(Paths.cache, `upload-${localId}.sctpkg`);
+      if (encryptedFile.exists) encryptedFile.delete();
+      encryptedFile.create();
+      encryptedFile.write(encrypted);
       const uploaded = await uploadDocument({
-        uri: asset.uri,
-        name: asset.name,
-        mimeType: asset.mimeType ?? "application/octet-stream",
-        size: asset.size ?? 0,
+        uri: encryptedFile.uri,
+        name: encryptedName,
+        mimeType: "application/vnd.sctracker.encrypted-package",
+        size: encrypted.length,
+        sha256: sha256Base64(encrypted),
         idempotencyKey: localId,
       });
       update((current) => ({
@@ -736,6 +759,12 @@ function OperationsScreen({
         ),
       }));
       Alert.alert(t.common.failed, providerError(error));
+    } finally {
+      if (encryptedFile?.exists) encryptedFile.delete();
+      if (asset.uri.startsWith(Paths.cache.uri)) {
+        const copiedSource = new File(asset.uri);
+        if (copiedSource.exists) copiedSource.delete();
+      }
     }
   }
 
@@ -784,11 +813,29 @@ function OperationsScreen({
 
   async function downloadAndShare(operation: OperationalRequest) {
     if (!operation.downloadUrl) return;
+    if (exportPassphrase.normalize("NFKC").length < 12) {
+      Alert.alert(t.operations.encryptionRequired, t.operations.passphraseHint);
+      return;
+    }
     try {
-      const destination = new File(Paths.cache, `evidence-${operation.id}.zip`);
-      const file = await File.downloadFileAsync(operation.downloadUrl, destination, { idempotent: true });
+      const response = await fetch(operation.downloadUrl);
+      if (!response.ok) throw new Error(`Download failed with status ${response.status}.`);
+      const encrypted = await encryptExport(
+        new Uint8Array(await response.arrayBuffer()),
+        exportPassphrase,
+        randomBytes,
+        `evidence-${operation.id}.json`,
+        response.headers.get("content-type") ?? "application/json",
+      );
+      const file = new File(Paths.cache, `evidence-${operation.id}.sctpkg`);
+      if (file.exists) file.delete();
+      file.create();
+      file.write(encrypted);
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(file.uri);
+        await Sharing.shareAsync(file.uri, {
+          mimeType: "application/vnd.sctracker.encrypted-package",
+          dialogTitle: t.operations.encryptedExport,
+        });
       } else {
         Alert.alert(t.common.download, file.uri);
       }
@@ -824,6 +871,13 @@ function OperationsScreen({
       </View>
       <View style={styles.card}>
         <Field label={t.common.subjectId} value={subjectId} onChangeText={setSubjectId} />
+        <Field
+          label={t.operations.exportPassphrase}
+          value={exportPassphrase}
+          onChangeText={setExportPassphrase}
+          secureTextEntry
+        />
+        <Text style={styles.caption}>{t.operations.passphraseHint}</Text>
         <Text style={styles.cardTitle}>{t.operations.satellite}</Text>
         <Button label={t.operations.requestSatellite} icon="planet" onPress={() => void create("satellite")} disabled={!configured} />
         <Text style={styles.cardTitle}>{t.operations.evidence}</Text>
@@ -1185,6 +1239,7 @@ export default function App() {
   }, [state, t.geofencing.backgroundPermissionError]);
 
   function update(recipe: (current: PersistedState) => PersistedState) {
+    if (syncing) return;
     setState((current) => current ? recipe(current) : current);
   }
 
@@ -1200,7 +1255,17 @@ export default function App() {
     }
     setSyncing(true);
     setSyncError(null);
-    const result = await synchronize(state, true);
+    const result = await synchronize(
+      state,
+      true,
+      authSession?.user.id
+        ? {
+            actorId: authActorId(authSession.user.id),
+            tenantId: authTenantId(activeScope),
+          }
+        : undefined,
+      (nextState) => saveState(nextState, activeScope),
+    );
     setState(result.state);
     if (result.error) setSyncError(result.error.message);
     setSyncing(false);

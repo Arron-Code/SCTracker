@@ -100,6 +100,10 @@ export type Translation = {
     checkStatus: string;
     noItems: string;
     providerBlocked: string;
+    exportPassphrase: string;
+    passphraseHint: string;
+    encryptionRequired: string;
+    encryptedExport: string;
   };
   help: { title: string; body: string };
   alerts: { required: string; saved: string; storageError: string };
@@ -173,10 +177,14 @@ export const translations = {
       requestEvidence: "Evidence Pack anfordern", dds: "DDS-Entwurf", createDds: "DDS-Entwurf erstellen",
       validateDds: "Validieren", submitDds: "Einreichen", checkStatus: "Status abrufen",
       noItems: "Noch keine Vorgänge.", providerBlocked: "Provider-Konfiguration fehlt. Dieser Vorgang ist blockiert.",
+      exportPassphrase: "Passphrase für verschlüsselten Export",
+      passphraseHint: "Mindestens 12 Zeichen. Teilen Sie die Passphrase getrennt vom Exportpaket.",
+      encryptionRequired: "Exportverschlüsselung erforderlich",
+      encryptedExport: "Verschlüsseltes SCTracker-Paket",
     },
     help: {
       title: "Offline und Datenschutz",
-      body: "GPS- und Personendaten nur mit Einwilligung erfassen. Lokale Änderungen bleiben bis zur bestätigten Synchronisierung erhalten. Konflikte werden nie automatisch überschrieben.",
+      body: "GPS- und Personendaten nur mit Einwilligung erfassen. Lokale Fachdaten werden verschlüsselt gespeichert, Exporte Ende-zu-Ende verschlüsselt und Änderungen signiert verkettet. Konflikte werden nie automatisch überschrieben.",
     },
     alerts: { required: "Bitte alle erforderlichen Felder ausfüllen.", saved: "Offline gespeichert.", storageError: "Lokale Daten konnten nicht sicher gespeichert werden." },
     auth: {
@@ -239,10 +247,14 @@ export const translations = {
       requestEvidence: "Request evidence pack", dds: "DDS draft", createDds: "Create DDS draft",
       validateDds: "Validate", submitDds: "Submit", checkStatus: "Check status", noItems: "No operations yet.",
       providerBlocked: "Provider configuration is missing. This operation is blocked.",
+      exportPassphrase: "Encrypted export passphrase",
+      passphraseHint: "At least 12 characters. Share the passphrase separately from the export package.",
+      encryptionRequired: "Export encryption required",
+      encryptedExport: "Encrypted SCTracker package",
     },
     help: {
       title: "Offline and privacy",
-      body: "Capture GPS and personal data only with consent. Local changes remain until sync is confirmed. Conflicts are never overwritten automatically.",
+      body: "Capture GPS and personal data only with consent. Local business data is encrypted, exports are end-to-end encrypted, and changes form a signed chain. Conflicts are never overwritten automatically.",
     },
     alerts: { required: "Complete all required fields.", saved: "Saved offline.", storageError: "Local data could not be stored safely." },
     auth: {
@@ -305,6 +317,10 @@ export const translations = {
       requestEvidence: "የማስረጃ ጥቅል ጠይቅ", dds: "የDDS ረቂቅ", createDds: "የDDS ረቂቅ ፍጠር",
       validateDds: "አረጋግጥ", submitDds: "አስገባ", checkStatus: "ሁኔታን አረጋግጥ",
       noItems: "ገና ሂደት የለም።", providerBlocked: "የአቅራቢ ውቅር የለም። ይህ ሂደት ታግዷል።",
+      exportPassphrase: "የተመሰጠረ ወጪ የይለፍ ሐረግ",
+      passphraseHint: "ቢያንስ 12 ቁምፊዎች። የይለፍ ሐረጉን ከፓኬጁ ተለይቶ ያጋሩ።",
+      encryptionRequired: "የወጪ ምስጠራ ያስፈልጋል",
+      encryptedExport: "የተመሰጠረ SCTracker ፓኬጅ",
     },
     help: {
       title: "ከመስመር ውጭ እና ግላዊነት",
@@ -371,6 +387,10 @@ export const translations = {
       requestEvidence: "ጥርናፈ መርትዖ ሕተት", dds: "ንድፊ DDS", createDds: "ንድፊ DDS ፍጠር",
       validateDds: "ኣረጋግጽ", submitDds: "ኣቕርብ", checkStatus: "ኩነታት ርአ",
       noItems: "ገና መስርሕ የለን።", providerBlocked: "ውቅር ኣቕራቢ የለን። እዚ መስርሕ ተዓጽዩ።",
+      exportPassphrase: "ናይ ዝተመስጠረ ሰደድ መሕለፊ ሓረግ",
+      passphraseHint: "እንተወሓደ 12 ፊደላት። መሕለፊ ሓረግ ካብቲ ፓኬጅ ፈሊኹም ኣካፍሉ።",
+      encryptionRequired: "ምስጢራዊ ሰደድ የድሊ",
+      encryptedExport: "ዝተመስጠረ SCTracker ፓኬጅ",
     },
     help: {
       title: "ካብ መስመር ወጻኢን ብሕታውነትን",

@@ -80,11 +80,15 @@ async function request<T>(
   return (body as SuccessEnvelope<T>).data;
 }
 
-export function pushOperations(deviceId: string, operations: OutboxOperation[]) {
+export function pushOperations(
+  deviceId: string,
+  operations: OutboxOperation[],
+  deviceKey?: { keyId: string; algorithm: "P256-SHA256"; publicKeyBase64: string },
+) {
   return request<PushResponse>("/api/v1/sync/push", {
     method: "POST",
     headers: { "Idempotency-Key": operations.map((item) => item.idempotencyKey).join(",") },
-    body: JSON.stringify({ deviceId, operations }),
+    body: JSON.stringify({ deviceId, ...(deviceKey ? { deviceKey } : {}), operations }),
   });
 }
 
@@ -98,6 +102,7 @@ export async function uploadDocument(asset: {
   name: string;
   mimeType: string;
   size: number;
+  sha256: string;
   idempotencyKey: string;
 }) {
   const initiation = await request<{
@@ -111,6 +116,7 @@ export async function uploadDocument(asset: {
       fileName: asset.name,
       mimeType: asset.mimeType,
       size: asset.size,
+      sha256: asset.sha256,
     }),
   });
   const blob = await fetch(asset.uri).then((response) => response.blob());

@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { AppError } from "./errors.js";
+import type { DeviceSigningKey, SignedEvent } from "./signed-events.js";
+import { canonicalJson, signedEventHash } from "./signed-events.js";
+
+const GENESIS_HASH = "0".repeat(64);
 
 const { Pool } = pg;
 export type ResourceType =
@@ -47,6 +51,11 @@ export interface Repository {
   findIdempotency(tenantId: string, key: string): Promise<unknown | null>;
   saveIdempotency(tenantId: string, key: string, response: unknown): Promise<void>;
   changes(tenantId: string, cursor: number, limit: number): Promise<Change[]>;
+  appendSignedEvents(
+    tenantId: string,
+    deviceKey: DeviceSigningKey & { deviceId: string; actorId: string },
+    events: SignedEvent[],
+  ): Promise<void>;
 }
 
 function now(): string {
@@ -70,6 +79,20 @@ export class MemoryRepository implements Repository {
   private readonly idempotency = new Map<string, unknown>();
   private readonly changeLog: Change[] = [];
   private readonly auditLog: unknown[] = [];
+  private readonly deviceKeysById = new Map<
+    string,
+    DeviceSigningKey & { deviceId: string; actorId: string }
+  >();
+  private readonly deviceKeysByDevice = new Map<
+    string,
+    DeviceSigningKey & { deviceId: string; actorId: string }
+  >();
+  private readonly signedEvents = new Map<string, SignedEvent[]>();
+  private readonly eventsById = new Map<string, {
+    tenantId: string;
+    deviceId: string;
+    event: SignedEvent;
+  }>();
 
   private bucket(type: ResourceType): Map<string, Resource> {
     const existing = this.resources.get(type);
@@ -155,6 +178,78 @@ export class MemoryRepository implements Repository {
     return this.changeLog.filter((change) => change.sequence > cursor && change.payload.tenantId === tenantId).slice(0, limit);
   }
 
+  async appendSignedEvents(
+    tenantId: string,
+    deviceKey: DeviceSigningKey & { deviceId: string; actorId: string },
+    events: SignedEvent[],
+  ): Promise<void> {
+    const keyIndex = `${tenantId}:${deviceKey.keyId}`;
+    const deviceIndex = `${tenantId}:${deviceKey.deviceId}`;
+    const bindings = [this.deviceKeysById.get(keyIndex), this.deviceKeysByDevice.get(deviceIndex)]
+      .filter((binding) => binding !== undefined);
+    if (bindings.some((binding) =>
+      binding.deviceId !== deviceKey.deviceId ||
+      binding.actorId !== deviceKey.actorId ||
+      binding.keyId !== deviceKey.keyId ||
+      binding.algorithm !== deviceKey.algorithm ||
+      binding.publicKeyBase64 !== deviceKey.publicKeyBase64
+    )) {
+      throw new AppError("DEVICE_KEY_MISMATCH", "Device signing binding cannot be changed", 409);
+    }
+    for (const event of events) {
+      if (
+        event.tenantId !== tenantId ||
+        event.deviceId !== deviceKey.deviceId ||
+        event.actorId !== deviceKey.actorId ||
+        event.keyId !== deviceKey.keyId
+      ) {
+        throw new AppError("INVALID_EVENT_CHAIN", "Signed event batch binding is invalid", 409);
+      }
+    }
+    const chainIndex = deviceIndex;
+    const chain = this.signedEvents.get(chainIndex) ?? [];
+    let sequence = chain.at(-1)?.sequence ?? 0;
+    let previousHash = chain.at(-1)?.eventHash ?? GENESIS_HASH;
+    const pendingIds = new Set<string>();
+    const existingEvents = events.map((event) => this.eventsById.get(event.eventId));
+    if (existingEvents.some((event) => event !== undefined)) {
+      const replayStart = sequence - events.length + 1;
+      const exactTailReplay = existingEvents.every((stored, index) =>
+        stored?.tenantId === tenantId &&
+        stored.deviceId === deviceKey.deviceId &&
+        stored.event.sequence === replayStart + index &&
+        canonicalJson(stored.event) === canonicalJson(events[index]),
+      );
+      if (!exactTailReplay || events.at(-1)?.sequence !== sequence) {
+        throw new AppError("INVALID_EVENT_CHAIN", "Signed event replay is not an exact chain tail", 409);
+      }
+      return;
+    }
+    for (const event of events) {
+      if (
+        event.sequence !== sequence + 1 ||
+        event.prevHash !== previousHash ||
+        event.eventHash !== signedEventHash(event) ||
+        pendingIds.has(event.eventId)
+      ) {
+        throw new AppError("INVALID_EVENT_CHAIN", "Signed event chain is not contiguous", 409);
+      }
+      sequence = event.sequence;
+      previousHash = event.eventHash;
+      pendingIds.add(event.eventId);
+    }
+    this.deviceKeysById.set(keyIndex, structuredClone(deviceKey));
+    this.deviceKeysByDevice.set(deviceIndex, structuredClone(deviceKey));
+    this.signedEvents.set(chainIndex, [...chain, ...structuredClone(events)]);
+    for (const event of events) {
+      this.eventsById.set(event.eventId, {
+        tenantId,
+        deviceId: deviceKey.deviceId,
+        event: structuredClone(event),
+      });
+    }
+  }
+
   private recordChange(type: ResourceType, resource: Resource): void {
     this.changeLog.push({
       sequence: this.changeLog.length + 1,
@@ -237,25 +332,33 @@ export class PgRepository implements Repository {
     patch: Record<string, unknown>,
     expectedUpdatedAt?: string,
   ): Promise<Resource> {
-    const existing = await this.get(type, tenantId, id);
-    if (!existing) throw new AppError("NOT_FOUND", `${type} resource not found`, 404);
-    if (expectedUpdatedAt && existing.updatedAt !== expectedUpdatedAt) {
+    const storedPatch = Object.fromEntries(
+      Object.entries(patch).filter(
+        ([key]) => !["id", "tenantId", "createdAt", "updatedAt"].includes(key),
+      ),
+    );
+    const result = await this.pool.query(
+      `UPDATE ${tableByType[type]}
+       SET payload = payload || $3::jsonb,
+           status = CASE
+             WHEN $3::jsonb ? 'status' AND jsonb_typeof($3::jsonb->'status') = 'string'
+               THEN $3::jsonb->>'status'
+             WHEN $3::jsonb ? 'status' THEN NULL
+             ELSE status
+           END,
+           updated_at = now()
+       WHERE tenant_id = $1 AND id = $2
+         AND ($4::timestamptz IS NULL OR date_trunc('milliseconds', updated_at) = $4::timestamptz)
+       RETURNING id, tenant_id, status, payload, created_at, updated_at`,
+      [tenantId, id, JSON.stringify(storedPatch), expectedUpdatedAt ?? null],
+    );
+    if (!result.rowCount) {
+      const existing = await this.get(type, tenantId, id);
+      if (!existing) throw new AppError("NOT_FOUND", `${type} resource not found`, 404);
       throw new AppError("SYNC_CONFLICT", "Resource changed since it was last synchronized", 409, {
         current: existing,
       });
     }
-    const payload = Object.fromEntries(
-      Object.entries({ ...existing, ...patch }).filter(
-        ([key]) => !["id", "tenantId", "createdAt", "updatedAt"].includes(key),
-      ),
-    );
-    const status = typeof payload.status === "string" ? payload.status : null;
-    const result = await this.pool.query(
-      `UPDATE ${tableByType[type]} SET payload = $3::jsonb, status = $4, updated_at = now()
-       WHERE tenant_id = $1 AND id = $2
-       RETURNING id, tenant_id, status, payload, created_at, updated_at`,
-      [tenantId, id, JSON.stringify(payload), status],
-    );
     const resource = fromRow(result.rows[0]);
     await this.recordChange(type, resource);
     return resource;
@@ -322,6 +425,130 @@ export class PgRepository implements Repository {
       payload: row.payload as Resource,
       occurredAt: new Date(String(row.occurred_at)).toISOString(),
     }));
+  }
+
+  async appendSignedEvents(
+    tenantId: string,
+    deviceKey: DeviceSigningKey & { deviceId: string; actorId: string },
+    events: SignedEvent[],
+  ): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [`${tenantId}:key:${deviceKey.keyId}`],
+      );
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [`${tenantId}:device:${deviceKey.deviceId}`],
+      );
+      const keyResult = await client.query(
+        `SELECT device_id, actor_id, key_id, algorithm, public_key_base64
+         FROM device_signing_keys
+         WHERE tenant_id = $1 AND (device_id = $2 OR key_id = $3)
+         FOR UPDATE`,
+        [tenantId, deviceKey.deviceId, deviceKey.keyId],
+      );
+      if (keyResult.rows.some((storedKey) =>
+        String(storedKey.device_id) !== deviceKey.deviceId ||
+        storedKey.actor_id !== deviceKey.actorId ||
+        storedKey.key_id !== deviceKey.keyId ||
+        storedKey.algorithm !== deviceKey.algorithm ||
+        storedKey.public_key_base64 !== deviceKey.publicKeyBase64
+      )) {
+        throw new AppError("DEVICE_KEY_MISMATCH", "Device signing binding cannot be changed", 409);
+      }
+      if (!keyResult.rowCount) {
+        await client.query(
+          `INSERT INTO device_signing_keys
+             (tenant_id, device_id, actor_id, key_id, algorithm, public_key_base64)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [
+            tenantId,
+            deviceKey.deviceId,
+            deviceKey.actorId,
+            deviceKey.keyId,
+            deviceKey.algorithm,
+            deviceKey.publicKeyBase64,
+          ],
+        );
+      }
+      for (const event of events) {
+        if (
+          event.tenantId !== tenantId ||
+          event.deviceId !== deviceKey.deviceId ||
+          event.actorId !== deviceKey.actorId ||
+          event.keyId !== deviceKey.keyId
+        ) {
+          throw new AppError("INVALID_EVENT_CHAIN", "Signed event batch binding is invalid", 409);
+        }
+      }
+      const last = await client.query(
+        `SELECT sequence, event_hash FROM signed_events
+         WHERE tenant_id = $1 AND device_id = $2
+         ORDER BY sequence DESC LIMIT 1`,
+        [tenantId, deviceKey.deviceId],
+      );
+      let sequence = last.rowCount ? Number(last.rows[0].sequence) : 0;
+      let previousHash = last.rowCount ? String(last.rows[0].event_hash) : GENESIS_HASH;
+      const existing = await client.query(
+        `SELECT event_id, tenant_id, device_id, sequence, event
+         FROM signed_events WHERE event_id = ANY($1::uuid[])`,
+        [events.map((event) => event.eventId)],
+      );
+      if (existing.rowCount) {
+        const byId = new Map(existing.rows.map((row) => [String(row.event_id), row]));
+        const replayStart = sequence - events.length + 1;
+        const exactTailReplay = existing.rowCount === events.length && events.every((event, index) => {
+          const stored = byId.get(event.eventId);
+          return (
+            stored &&
+            String(stored.tenant_id) === tenantId &&
+            String(stored.device_id) === deviceKey.deviceId &&
+            Number(stored.sequence) === replayStart + index &&
+            canonicalJson(stored.event) === canonicalJson(event)
+          );
+        });
+        if (!exactTailReplay || events.at(-1)?.sequence !== sequence) {
+          throw new AppError("INVALID_EVENT_CHAIN", "Signed event replay is not an exact chain tail", 409);
+        }
+        await client.query("COMMIT");
+        return;
+      }
+      for (const event of events) {
+        if (event.sequence !== sequence + 1 || event.prevHash !== previousHash) {
+          throw new AppError("INVALID_EVENT_CHAIN", "Signed event chain is not contiguous", 409);
+        }
+        const eventHash = signedEventHash(event);
+        if (event.eventHash !== eventHash) {
+          throw new AppError("INVALID_EVENT_CHAIN", "Signed event hash is invalid", 409);
+        }
+        await client.query(
+          `INSERT INTO signed_events
+             (event_id, tenant_id, device_id, actor_id, key_id, sequence, prev_hash,
+              event_hash, event_type, aggregate_id, reported_utc, payload_hash, event)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb)`,
+          [
+            event.eventId, tenantId, event.deviceId, event.actorId, event.keyId,
+            event.sequence, event.prevHash, eventHash, event.eventType,
+            event.aggregateId, event.reportedUtc, event.payloadHash, JSON.stringify(event),
+          ],
+        );
+        sequence = event.sequence;
+        previousHash = event.eventHash;
+      }
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      if (error instanceof AppError) throw error;
+      if ((error as { code?: string }).code === "23505") {
+        throw new AppError("INVALID_EVENT_CHAIN", "Signed event already exists or chain raced", 409);
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   private async recordChange(type: ResourceType, resource: Resource): Promise<void> {

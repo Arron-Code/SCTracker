@@ -1,12 +1,22 @@
 import { ApiError, pullChanges, pushOperations } from "./api";
 import type { OutboxOperation, PersistedState, Plot, Supplier } from "./domain";
+import { sealPendingOperations } from "./event-chain";
+import { getDeviceSigningKey } from "./secure-crypto";
 
 export type SyncResult = {
   state: PersistedState;
   error?: ApiError | Error;
 };
 
+export type SyncIdentity = {
+  actorId: string;
+  tenantId: string;
+};
+
+export type PersistBeforeNetwork = (state: PersistedState) => Promise<void>;
+
 const retryDelay = (attempts: number) => Math.min(60_000, 1_000 * 2 ** attempts);
+const MAX_PUSH_OPERATIONS = 100;
 
 function mergeRemote(
   items: Array<Supplier | Plot>,
@@ -21,23 +31,42 @@ function mergeRemote(
   return copy;
 }
 
-export async function synchronize(input: PersistedState, force = false): Promise<SyncResult> {
+export async function synchronize(
+  input: PersistedState,
+  force = false,
+  identity?: SyncIdentity,
+  persist?: PersistBeforeNetwork,
+): Promise<SyncResult> {
   let state: PersistedState = {
     ...input,
     outbox: input.outbox.map((item) => ({ ...item })),
     conflicts: [...input.conflicts],
   };
-  const now = Date.now();
-  const ready = state.outbox.filter(
-    (item) => force || !item.nextAttemptAt || Date.parse(item.nextAttemptAt) <= now,
-  );
+  let ready: OutboxOperation[] = [];
   try {
-    if (ready.length > 0) {
-      const pushed = await pushOperations(state.deviceId, ready);
+    if (!identity) throw new Error("An authenticated identity is required to sign synchronization events.");
+    state = await sealPendingOperations(state, identity.actorId, identity.tenantId);
+    if (persist) await persist(state);
+    const now = Date.now();
+    const ordered = [...state.outbox].sort(
+      (left, right) => (left.event?.sequence ?? 0) - (right.event?.sequence ?? 0),
+    );
+    for (const item of ordered) {
+      if (!force && item.nextAttemptAt && Date.parse(item.nextAttemptAt) > now) break;
+      ready.push(item);
+    }
+    const deviceKey = await getDeviceSigningKey();
+    for (let offset = 0; offset < ready.length; offset += MAX_PUSH_OPERATIONS) {
+      const batch = ready.slice(offset, offset + MAX_PUSH_OPERATIONS);
+      const pushed = await pushOperations(state.deviceId, batch, deviceKey);
+      const expectedHead = batch.at(-1)?.event?.eventHash;
+      if (!expectedHead || pushed.chainHead !== expectedHead) {
+        throw new Error("The server did not acknowledge the signed event-chain head.");
+      }
       const accepted = new Set(pushed.accepted);
       const conflicts = pushed.conflicts ?? [];
       const conflictIds = new Set(conflicts.map((item) => item.operationId));
-      const acceptedEntities = ready.filter((item) => accepted.has(item.id));
+      const acceptedEntities = batch.filter((item) => accepted.has(item.id));
       const appliedByOperation = new Map<string, Supplier | Plot>();
       for (const item of pushed.applied ?? []) {
         if (item.operationId) appliedByOperation.set(item.operationId, item.resource);
@@ -72,7 +101,7 @@ export async function synchronize(input: PersistedState, force = false): Promise
         conflicts: [
           ...state.conflicts,
           ...conflicts.map((conflict) => {
-            const local = ready.find((item) => item.id === conflict.operationId);
+            const local = batch.find((item) => item.id === conflict.operationId);
             if (!local) {
               throw new Error(`Conflict operation ${conflict.operationId} is missing.`);
             }
@@ -87,6 +116,7 @@ export async function synchronize(input: PersistedState, force = false): Promise
           }),
         ],
       };
+      if (persist) await persist(state);
     }
     const pulled = await pullChanges(state.cursor);
     for (const change of pulled.changes) {
@@ -124,6 +154,7 @@ export async function synchronize(input: PersistedState, force = false): Promise
     }
     state.cursor = pulled.cursor;
     state.lastSyncAt = new Date().toISOString();
+    if (persist) await persist(state);
     return { state };
   } catch (error) {
     const readyIds = new Set(ready.map((item) => item.id));
@@ -139,6 +170,16 @@ export async function synchronize(input: PersistedState, force = false): Promise
         lastError: error instanceof Error ? error.message : String(error),
       };
     });
+    if (persist) {
+      try {
+        await persist(state);
+      } catch (persistError) {
+        return {
+          state,
+          error: persistError instanceof Error ? persistError : new Error(String(persistError)),
+        };
+      }
+    }
     return { state, error: error instanceof Error ? error : new Error(String(error)) };
   }
 }
