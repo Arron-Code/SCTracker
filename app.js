@@ -35,9 +35,16 @@ const state = {
     plots: null,
     shipments: null,
   },
+  administration: {
+    users: [],
+    devices: [],
+    keys: [],
+    error: null,
+  },
 };
 const views = [...document.querySelectorAll(".view")];
 const navLinks = [...document.querySelectorAll(".nav-link")];
+const appShell = document.querySelector("#app-shell");
 const pageTitle = document.querySelector("#page-title");
 const toast = document.querySelector("#toast");
 const dialog = document.querySelector("#workflow-dialog");
@@ -66,6 +73,11 @@ const organizationForm = document.querySelector("#organization-form");
 const organizationSelect = document.querySelector("#organization-select");
 const organizationSelectButton = document.querySelector("#organization-select-button");
 const signOutButton = document.querySelector("#sign-out-button");
+const administrationUsers = document.querySelector("#administration-users");
+const administrationDevices = document.querySelector("#administration-devices");
+const administrationKeys = document.querySelector("#administration-keys");
+const administrationError = document.querySelector("#administration-error");
+const administrationRefresh = document.querySelector("#administration-refresh");
 let activeDialog;
 let activeLanguage = getInitialLanguage();
 let toastTimer;
@@ -138,6 +150,9 @@ function showView(viewId) {
   views.forEach((view) => view.classList.toggle("active", view === selected));
   navLinks.forEach((link) => link.classList.toggle("active", link.dataset.view === selected.id));
   pageTitle.textContent = t(selected.dataset.titleKey);
+  if (selected.id === "administration" && authState.session?.session?.activeOrganizationId) {
+    void loadAdministration();
+  }
 }
 
 function renderDynamicContent() {
@@ -234,6 +249,81 @@ function renderShipments() {
     </tr>`).join("");
 }
 
+function administrationActions(scope, id, stateValue) {
+  const trusted = stateValue === "LOCALLY_TRUSTED" || stateValue === "ORGANIZATION_VERIFIED";
+  return `
+    <div class="administration-actions">
+      <button class="text-button" type="button" data-trust-scope="${scope}" data-trust-id="${escapeHtml(id)}" data-trust-state="${trusted ? "UNVERIFIED" : "LOCALLY_TRUSTED"}">
+        ${escapeHtml(t(trusted ? "administration.unverify" : "administration.trust"))}
+      </button>
+      <button class="text-button danger" type="button" data-trust-scope="${scope}" data-trust-id="${escapeHtml(id)}" data-trust-state="SUSPENDED">
+        ${escapeHtml(t("administration.suspend"))}
+      </button>
+    </div>`;
+}
+
+function renderAdministration() {
+  administrationError.hidden = !state.administration.error;
+  administrationError.textContent = state.administration.error
+    ? errorMessage(state.administration.error)
+    : "";
+  const { users, devices, keys } = state.administration;
+  administrationUsers.innerHTML = users.length === 0
+    ? `<tr><td colspan="5"><div class="resource-state">${escapeHtml(t("administration.emptyUsers"))}</div></td></tr>`
+    : users.map((user) => `
+      <tr>
+        <td><strong>${escapeHtml(user.displayName ?? user.email ?? user.actorId)}</strong><small>${escapeHtml(user.email ?? user.actorId)}</small></td>
+        <td>${escapeHtml((user.roles ?? []).join(", ") || "—")}</td>
+        <td><span class="badge neutral">${escapeHtml(user.trustState ?? user.status ?? "UNVERIFIED")}</span></td>
+        <td>${escapeHtml(user.lastAuthenticatedAt ?? "—")}</td>
+        <td>${administrationActions("user", user.actorId, user.trustState)}</td>
+      </tr>`).join("");
+  administrationDevices.innerHTML = devices.length === 0
+    ? `<tr><td colspan="5"><div class="resource-state">${escapeHtml(t("administration.emptyDevices"))}</div></td></tr>`
+    : devices.map((device) => `
+      <tr>
+        <td><strong>${escapeHtml(device.displayName)}</strong><small>${escapeHtml(device.deviceId)}</small></td>
+        <td>${escapeHtml(device.platform)} · ${escapeHtml(device.appVersion)}</td>
+        <td><span class="badge neutral">${escapeHtml(device.trustState ?? device.status)}</span></td>
+        <td><span class="badge neutral">${escapeHtml(device.attestationStatus ?? t("administration.notAttested"))}</span><small>${escapeHtml(device.lastAttestedAt ?? "—")}</small></td>
+        <td>${administrationActions("device", device.deviceId, device.trustState)}</td>
+      </tr>`).join("");
+  administrationKeys.innerHTML = keys.length === 0
+    ? `<tr><td colspan="5"><div class="resource-state">${escapeHtml(t("administration.emptyKeys"))}</div></td></tr>`
+    : keys.map((key) => `
+      <tr>
+        <td><strong>${escapeHtml(key.keyId)}</strong><small>${escapeHtml(key.actorId)}</small></td>
+        <td>${escapeHtml(key.deviceId)}</td>
+        <td>${escapeHtml(key.algorithm)}</td>
+        <td><span class="badge ${key.status === "revoked" ? "danger" : "neutral"}">${escapeHtml(key.status)}</span></td>
+        <td>
+          ${key.status === "revoked" ? "—" : `<button class="text-button danger" type="button" data-revoke-key="${escapeHtml(key.keyId)}">${escapeHtml(t("administration.revoke"))}</button>`}
+        </td>
+      </tr>`).join("");
+}
+
+async function loadAdministration() {
+  administrationError.hidden = true;
+  administrationUsers.innerHTML = `<tr><td colspan="5"><div class="resource-state loading">${escapeHtml(t("common.loading"))}</div></td></tr>`;
+  administrationDevices.innerHTML = administrationUsers.innerHTML;
+  administrationKeys.innerHTML = administrationUsers.innerHTML;
+  const results = await Promise.allSettled([
+    api.administration.users(),
+    api.administration.devices(),
+    api.administration.keys(),
+  ]);
+  const keys = ["users", "devices", "keys"];
+  const rejected = results.find((result) => result.status === "rejected");
+  results.forEach((result, index) => {
+    state.administration[keys[index]] =
+      result.status === "fulfilled" && Array.isArray(result.value.data)
+        ? result.value.data
+        : [];
+  });
+  state.administration.error = rejected?.reason ?? null;
+  renderAdministration();
+}
+
 function clearResources() {
   state.suppliers = [];
   state.plots = [];
@@ -244,6 +334,8 @@ function clearResources() {
   renderSuppliers();
   renderPlots();
   renderShipments();
+  state.administration = { users: [], devices: [], keys: [], error: null };
+  renderAdministration();
 }
 
 async function loadResources() {
@@ -282,6 +374,7 @@ function setLanguage(language) {
   renderSuppliers();
   renderPlots();
   renderShipments();
+  renderAdministration();
   renderAuth();
   showView(location.hash.slice(1) || "overview");
   languageButtons.forEach((button) => {
@@ -299,6 +392,23 @@ function setAuthBusy(busy) {
   authStatus.textContent = busy ? t("auth.loading") : "";
 }
 
+function updateAuthGate() {
+  const unlocked = Boolean(
+    authState.session?.session?.activeOrganizationId &&
+    authAction !== "resetPassword",
+  );
+  const wasGated = authDialog.dataset.gated === "true";
+  appShell.hidden = !unlocked;
+  authDialog.dataset.gated = String(!unlocked);
+  authDialog.classList.toggle("auth-gate", !unlocked);
+  authDialog.querySelector(".dialog-close").hidden = !unlocked;
+  if (!unlocked && !authDialog.open) {
+    authDialog.showModal();
+  } else if (unlocked && wasGated && authDialog.open) {
+    authDialog.close();
+  }
+}
+
 function renderAuth() {
   const session = authState.session;
   const isResettingPassword = authAction === "resetPassword";
@@ -311,6 +421,7 @@ function renderAuth() {
   authSignedIn.hidden = !session || isResettingPassword;
   authError.textContent = authState.error ? errorMessage(authState.error) : "";
   authStatus.textContent = authState.loading ? t("auth.loading") : "";
+  updateAuthGate();
 
   if (!auth.configured) {
     authError.textContent = t("auth.notConfiguredDetail");
@@ -342,6 +453,7 @@ function renderAuth() {
   if (!activeId) {
     authError.textContent = t("auth.organizationRequired");
   }
+  updateAuthGate();
 }
 
 async function refreshAuth() {
@@ -602,6 +714,43 @@ languageButtons.forEach((button) => button.addEventListener("click", () => setLa
 document.querySelectorAll("[data-dialog]").forEach((button) =>
   button.addEventListener("click", () => openDialog(button.dataset.dialog)),
 );
+administrationRefresh.addEventListener("click", () => void loadAdministration());
+document.querySelector("#administration").addEventListener("click", (event) => {
+  const trustButton = event.target.closest("[data-trust-scope]");
+  if (trustButton) {
+    const reason = window.prompt(t("administration.reasonPrompt"));
+    if (!reason?.trim()) return;
+    const action = trustButton.dataset.trustScope === "user"
+      ? api.administration.setUserTrust
+      : api.administration.setDeviceTrust;
+    trustButton.disabled = true;
+    void action(trustButton.dataset.trustId, {
+      state: trustButton.dataset.trustState,
+      reason: reason.trim(),
+      details: {},
+    }).then(loadAdministration).catch((error) => {
+      state.administration.error = error;
+      renderAdministration();
+    }).finally(() => {
+      trustButton.disabled = false;
+    });
+    return;
+  }
+  const revokeButton = event.target.closest("[data-revoke-key]");
+  if (!revokeButton) return;
+  const reason = window.prompt(t("administration.revokeReasonPrompt"));
+  if (!reason?.trim()) return;
+  revokeButton.disabled = true;
+  void api.administration.revokeKey(revokeButton.dataset.revokeKey, reason.trim())
+    .then(loadAdministration)
+    .catch((error) => {
+      state.administration.error = error;
+      renderAdministration();
+    })
+    .finally(() => {
+      revokeButton.disabled = false;
+    });
+});
 dialog.querySelector("form").addEventListener("submit", submitDialog);
 dialog.addEventListener("close", () => {
   dialog.querySelector("form").reset();
@@ -702,7 +851,10 @@ setLanguage(activeLanguage);
 if (resetToken) authDialog.showModal();
 void refreshAuth().then(() => {
   if (authState.session?.session?.activeOrganizationId) {
-    return loadResources();
+    return loadResources().then(() => {
+      if (location.hash === "#administration") return loadAdministration();
+      return undefined;
+    });
   }
   renderSuppliers();
   renderPlots();

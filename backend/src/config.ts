@@ -13,6 +13,7 @@ const schema = z.object({
     .default("google")
     .transform((value) => value.split(",").map((provider) => provider.trim()).filter(Boolean))
     .pipe(z.array(z.string().regex(/^[a-z0-9-]+$/)).min(1)),
+  SC_TRACKER_FRONTEND_URL: z.string().url().optional(),
   FRONTEND_ORIGINS: z
     .string()
     .default("http://localhost:4173,http://127.0.0.1:4173")
@@ -32,6 +33,11 @@ const schema = z.object({
   EU_IS_BASE_URL: z.string().url().optional(),
   EU_IS_CLIENT_ID: z.string().optional(),
   EU_IS_CLIENT_SECRET: z.string().optional(),
+  PLAY_INTEGRITY_VERIFY_URL: z.string().url().optional(),
+  PLAY_INTEGRITY_VERIFY_TOKEN: z.string().optional(),
+  APP_ATTEST_VERIFY_URL: z.string().url().optional(),
+  APP_ATTEST_VERIFY_TOKEN: z.string().optional(),
+  ATTESTATION_CHALLENGE_TTL_SECONDS: z.coerce.number().int().positive().default(600),
 });
 
 export type Config = z.infer<typeof schema>;

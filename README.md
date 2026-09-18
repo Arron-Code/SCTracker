@@ -87,6 +87,13 @@ Set `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_NEON_AUTH_URL` in `mobile\.env`.
 These URLs are public configuration, not secrets. Native auth cookies are kept
 by the official Better Auth Expo plugin in `expo-secure-store`; raw JWTs are
 requested with `token()` for each API call and are never saved in AsyncStorage.
+Login or registration and an active organization are required before any
+business data is loaded. The app supports portrait, landscape, and tablet
+layouts. Before signed synchronization it centrally registers the installation
+and signing key, requests Play Integrity or App Attest evidence when available,
+and records an explicit unverified status when provider verification is not
+configured. Android builds require
+`EXPO_PUBLIC_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER` for Play Integrity.
 Offline supplier, plot, geofence, outbox, and event-chain data is protected with
 XChaCha20-Poly1305; the installation key and stable device identity are held in
 `expo-secure-store`. Existing plaintext state is encrypted during first load.

@@ -1,6 +1,6 @@
 import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
-import { EuInformationSystemV3Provider, S3StorageProvider, SentinelHubProvider } from "./providers.js";
+import { EuInformationSystemV3Provider, ProviderBackedAttestationProvider, S3StorageProvider, SentinelHubProvider } from "./providers.js";
 import { PgRepository } from "./repository.js";
 
 const config = loadConfig();
@@ -11,6 +11,7 @@ const app = await buildApp({
     storage: new S3StorageProvider(config),
     satellite: new SentinelHubProvider(config),
     dds: new EuInformationSystemV3Provider(config),
+    attestation: new ProviderBackedAttestationProvider(config),
   },
 });
 

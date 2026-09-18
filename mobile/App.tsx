@@ -19,11 +19,13 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import {
   ApiError,
   configureApiAuth,
+  configureApiDevice,
   getApiBaseUrl,
   getOperation,
   requestOperation,
@@ -73,7 +75,7 @@ import {
   type Language,
   type Translation,
 } from "./src/i18n";
-import { emptyState, LANGUAGE_STORAGE_KEY, loadState, saveState } from "./src/storage";
+import { LANGUAGE_STORAGE_KEY, loadState, saveState } from "./src/storage";
 import { synchronize } from "./src/sync";
 
 type Tab = "home" | "suppliers" | "plots" | "operations" | "help";
@@ -1115,10 +1117,12 @@ function LanguageChooser({
 }
 
 export default function App() {
+  const { width, height } = useWindowDimensions();
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [language, setLanguage] = useState<Language>("de");
   const [languageOpen, setLanguageOpen] = useState(false);
   const [state, setState] = useState<PersistedState | null>(null);
+  const [loadedScope, setLoadedScope] = useState<string | null>(null);
   const [online, setOnline] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -1131,8 +1135,12 @@ export default function App() {
   const monitoredGeofences = useRef("");
   const t = translations[language];
   const configured = getApiBaseUrl() !== null;
-  const authorized = Boolean(authSession?.session.activeOrganizationId);
-  const activeScope = authSession?.session.activeOrganizationId ?? "local";
+  const activeOrganizationId = authSession?.session.activeOrganizationId ?? null;
+  const authorized = Boolean(activeOrganizationId);
+  const activeScope = activeOrganizationId && authSession?.user.id
+    ? `${authTenantId(activeOrganizationId)}:${authActorId(authSession.user.id)}`
+    : "local";
+  const wideLayout = width >= 840 && width > height;
 
   async function refreshAuth() {
     if (!authConfigured) {
@@ -1156,12 +1164,10 @@ export default function App() {
 
   useEffect(() => {
     let active = true;
-    void Promise.all([AsyncStorage.getItem(LANGUAGE_STORAGE_KEY), loadState("local")])
-      .then(([storedLanguage, storedState]) => {
+    void AsyncStorage.getItem(LANGUAGE_STORAGE_KEY)
+      .then((storedLanguage) => {
         if (!active) return;
         if (isLanguage(storedLanguage)) setLanguage(storedLanguage);
-        setState(storedState);
-        persistReady.current = true;
       })
       .catch(() => Alert.alert(translations.de.alerts.storageError));
     const unsubscribe = NetInfo.addEventListener((network) => {
@@ -1178,40 +1184,48 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    configureApiDevice(
+      state && loadedScope === activeScope
+        ? () => state.deviceId
+        : null,
+    );
+    return () => configureApiDevice(null);
+  }, [activeScope, loadedScope, state]);
+
+  useEffect(() => {
     if (!state || !persistReady.current) return;
     void saveState(state, stateScope.current).catch(() => Alert.alert(t.alerts.storageError));
   }, [state, t.alerts.storageError]);
 
   useEffect(() => {
-    if (!state || activeScope === stateScope.current) return;
+    if (authLoading) return;
     let active = true;
     persistReady.current = false;
-    const previousScope = stateScope.current;
-    const previousState = state;
+    if (!authorized) {
+      stateScope.current = "local";
+      monitoredGeofences.current = "";
+      setLoadedScope(null);
+      setState(null);
+      void synchronizeGeofencing([]).catch((error) => {
+        console.error("Could not stop geofencing after sign out", error);
+      });
+      return () => {
+        active = false;
+      };
+    }
+    setLoadedScope(null);
+    setState(null);
     void (async () => {
       await synchronizeGeofencing([]).catch((error) => {
         console.error("Could not stop geofencing during organization switch", error);
         Alert.alert(t.geofencing.backgroundPermissionError);
       });
-      await saveState(previousState, previousScope);
-      let nextState = await loadState(activeScope);
-      const previousHasOfflineWork =
-        previousState.suppliers.length > 0 ||
-        previousState.plots.length > 0 ||
-        previousState.outbox.length > 0;
-      const nextIsEmpty =
-        nextState.suppliers.length === 0 &&
-        nextState.plots.length === 0 &&
-        nextState.outbox.length === 0;
-      if (previousScope === "local" && activeScope !== "local" && previousHasOfflineWork && nextIsEmpty) {
-        nextState = { ...previousState, cursor: null, lastSyncAt: null };
-        await saveState(nextState, activeScope);
-        await saveState(emptyState(), "local");
-      }
+      const nextState = await loadState(activeScope);
       if (!active) return;
       stateScope.current = activeScope;
       monitoredGeofences.current = "";
       setState(nextState);
+      setLoadedScope(activeScope);
       persistReady.current = true;
     })().catch(() => {
       if (!active) return;
@@ -1221,7 +1235,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [activeScope, state, t.alerts.storageError]);
+  }, [activeScope, authLoading, authorized, t.alerts.storageError, t.geofencing.backgroundPermissionError]);
 
   useEffect(() => {
     if (!state || !persistReady.current) return;
@@ -1245,11 +1259,15 @@ export default function App() {
 
   async function syncNow() {
     if (!state || syncing) return;
+    if (loadedScope !== activeScope) {
+      setSyncError(t.auth.organizationRequired);
+      return;
+    }
     if (!configured) {
       setSyncError(t.sync.notConfiguredDetail);
       return;
     }
-    if (!authorized) {
+    if (!activeOrganizationId) {
       setSyncError(t.auth.organizationRequired);
       return;
     }
@@ -1261,7 +1279,7 @@ export default function App() {
       authSession?.user.id
         ? {
             actorId: authActorId(authSession.user.id),
-            tenantId: authTenantId(activeScope),
+            tenantId: authTenantId(activeOrganizationId),
           }
         : undefined,
       (nextState) => saveState(nextState, activeScope),
@@ -1318,13 +1336,70 @@ export default function App() {
     return <HomeScreen state={state} t={t} />;
   }, [activeTab, state, t]);
 
-  if (!state) {
+  if (authLoading || (authorized && (!state || loadedScope !== activeScope))) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <ActivityIndicator style={styles.loader} size="large" color={palette.lime} />
       </SafeAreaView>
     );
   }
+
+  if (!authorized) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar style="light" />
+        <View style={styles.header}>
+          <View style={styles.logo}><Text style={styles.logoText}>SC</Text></View>
+          <View style={styles.flex}>
+            <Text style={styles.brand}>SCTracker</Text>
+            <Text style={styles.headerSub}>{t.brandSubtitle}</Text>
+          </View>
+          <Pressable
+            style={styles.languageButton}
+            onPress={() => setLanguageOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={t.chooseLanguage}
+          >
+            <Ionicons name="language" size={20} color="#FFFFFF" />
+            <Text style={styles.languageCode}>{t.languageCode}</Text>
+          </Pressable>
+        </View>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={[styles.authPage, wideLayout && styles.authPageWide]}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.authContainer}>
+            <View style={styles.authIntro}>
+              <Text style={styles.authTitle}>SCTracker</Text>
+              <Text style={styles.authSubtitle}>{t.brandSubtitle}</Text>
+            </View>
+            <AuthCard
+              session={authSession}
+              organizations={organizations}
+              loading={false}
+              error={authError}
+              refresh={refreshAuth}
+              t={t}
+            />
+          </View>
+        </ScrollView>
+        <LanguageChooser
+          visible={languageOpen}
+          language={language}
+          onClose={() => setLanguageOpen(false)}
+          onSelect={(next) => {
+            setLanguage(next);
+            setLanguageOpen(false);
+            void AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, next).catch(() => Alert.alert(translations[next].alerts.storageError));
+          }}
+          t={t}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  if (!state) return null;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -1363,7 +1438,11 @@ export default function App() {
           disabled={syncing || !online || !configured || !authorized}
         />
       </View>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, wideLayout && styles.contentWide]}
+        keyboardShouldPersistTaps="handled"
+      >
         {!configured ? (
           <View style={styles.blocking}>
             <Ionicons name="warning" size={23} color={palette.red} />
@@ -1373,14 +1452,7 @@ export default function App() {
             </View>
           </View>
         ) : null}
-        <AuthCard
-          session={authSession}
-          organizations={organizations}
-          loading={authLoading}
-          error={authError}
-          refresh={refreshAuth}
-          t={t}
-        />
+        <AuthCard session={authSession} organizations={organizations} loading={false} error={authError} refresh={refreshAuth} t={t} />
         {state.conflicts.length > 0 ? (
           <Section title={t.sync.conflicts}>
             {state.conflicts.map((conflict) => (
@@ -1445,6 +1517,13 @@ const styles = StyleSheet.create({
   syncText: { flex: 1, color: palette.forest, fontSize: 10, fontWeight: "700" },
   scroll: { flex: 1, backgroundColor: palette.paper },
   content: { gap: 13, padding: 15, paddingBottom: 28 },
+  contentWide: { width: "100%", maxWidth: 1180, alignSelf: "center", paddingHorizontal: 28 },
+  authPage: { flexGrow: 1, justifyContent: "center", padding: 20 },
+  authPageWide: { paddingVertical: 36 },
+  authContainer: { width: "100%", maxWidth: 560, alignSelf: "center", gap: 18 },
+  authIntro: { alignItems: "center", gap: 5 },
+  authTitle: { color: palette.ink, fontSize: 32, fontWeight: "900" },
+  authSubtitle: { color: palette.muted, fontSize: 13, textAlign: "center" },
   section: { gap: 8, marginBottom: 3 },
   heading: { color: palette.ink, fontFamily: Platform.select({ ios: "Georgia", android: "serif" }), fontSize: 25, fontWeight: "700" },
   description: { color: palette.muted, fontSize: 11, lineHeight: 17 },

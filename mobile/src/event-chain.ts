@@ -47,7 +47,8 @@ async function signOperation(
   actorId: string,
   tenantId: string,
 ): Promise<SignedEvent> {
-  const signingKey = await getDeviceSigningKey();
+  const credentialScope = `${tenantId}:${actorId}`;
+  const signingKey = await getDeviceSigningKey(credentialScope);
   const sequence = state.events.length + 1;
   const unsigned: EventSigningMaterial = {
     schema: 1,
@@ -64,7 +65,10 @@ async function signOperation(
     keyId: signingKey.keyId,
   };
   const eventHash = sha256Hex(canonicalJson(unsigned));
-  const signature = p256Sign(textEncoder.encode(canonicalJson(unsigned)), await getSigningPrivateKey());
+  const signature = p256Sign(
+    textEncoder.encode(canonicalJson(unsigned)),
+    await getSigningPrivateKey(credentialScope),
+  );
   return {
     ...unsigned,
     eventHash,

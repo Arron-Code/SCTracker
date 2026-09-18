@@ -202,5 +202,16 @@ export function createApiClient(options = {}) {
       create: (input) => mock ? mock.createJob("dds", input) : json("POST", "/dds/submissions", input),
       get: (id) => mock ? mock.getJob("dds", id) : request(`/dds/submissions/${encodeURIComponent(id)}`),
     },
+    administration: {
+      users: () => request("/admin/users"),
+      devices: () => request("/admin/devices"),
+      keys: () => request("/admin/keys"),
+      setUserTrust: (actorId, input) =>
+        json("PATCH", `/admin/users/${encodeURIComponent(actorId)}/trust`, input),
+      setDeviceTrust: (deviceId, input) =>
+        json("PATCH", `/admin/devices/${encodeURIComponent(deviceId)}/trust`, input),
+      revokeKey: (keyId, reason) =>
+        json("POST", `/admin/keys/${encodeURIComponent(keyId)}/revoke`, { reason }),
+    },
   };
 }

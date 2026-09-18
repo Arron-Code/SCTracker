@@ -9,10 +9,10 @@
       data-i18n-content="meta.description"
     />
     <title>SCTracker | Coffee Evidence</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=5" />
   </head>
   <body>
-    <div class="app-shell">
+    <div class="app-shell" id="app-shell" hidden>
       <aside class="sidebar">
         <a class="brand" href="#overview" aria-label="SCTracker Startseite" data-i18n-aria-label="aria.home">
           <span class="brand-mark">SC</span>
@@ -41,8 +41,11 @@
           <a class="nav-link" href="#dds" data-view="dds">
             <span>06</span><span data-i18n="nav.dds">DDS</span>
           </a>
+          <a class="nav-link" href="#administration" data-view="administration">
+            <span>07</span><span data-i18n="nav.administration">Benutzer & Geräte</span>
+          </a>
           <a class="nav-link" href="#guide" data-view="guide">
-            <span>07</span><span data-i18n="nav.guide">Anleitung</span>
+            <span>08</span><span data-i18n="nav.guide">Anleitung</span>
           </a>
         </nav>
 
@@ -338,6 +341,84 @@
           </div>
         </section>
 
+        <section class="view" id="administration" data-title-key="title.administration">
+          <div class="section-intro">
+            <div>
+              <p class="eyebrow" data-i18n="administration.eyebrow">VERTRAUENSVERWALTUNG</p>
+              <h2 data-i18n="administration.title">Benutzer, Geräte und Schlüssel</h2>
+              <p data-i18n="administration.description">Organisationsbezogene Verwaltung von Zugriff, Gerätevertrauen, Attestierung und Signaturschlüsseln.</p>
+            </div>
+            <button class="secondary-button" id="administration-refresh" type="button" data-i18n="common.refresh">Aktualisieren</button>
+          </div>
+          <div class="resource-state error" id="administration-error" role="alert" hidden></div>
+          <article class="panel table-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow" data-i18n="administration.usersEyebrow">ORGANISATION</p>
+                <h3 data-i18n="administration.users">Benutzer</h3>
+              </div>
+            </div>
+            <div class="responsive-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th data-i18n="administration.identity">Identität</th>
+                    <th data-i18n="administration.roles">Rollen</th>
+                    <th data-i18n="administration.status">Status</th>
+                    <th data-i18n="administration.lastSeen">Letzte Anmeldung</th>
+                    <th data-i18n="administration.actions">Aktionen</th>
+                  </tr>
+                </thead>
+                <tbody id="administration-users"></tbody>
+              </table>
+            </div>
+          </article>
+          <article class="panel table-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow" data-i18n="administration.devicesEyebrow">GERÄTEVERTRAUEN</p>
+                <h3 data-i18n="administration.devices">Geräte</h3>
+              </div>
+            </div>
+            <div class="responsive-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th data-i18n="administration.device">Gerät</th>
+                    <th data-i18n="administration.platform">Plattform</th>
+                    <th data-i18n="administration.status">Status</th>
+                    <th data-i18n="administration.attestation">Attestierung</th>
+                    <th data-i18n="administration.actions">Aktionen</th>
+                  </tr>
+                </thead>
+                <tbody id="administration-devices"></tbody>
+              </table>
+            </div>
+          </article>
+          <article class="panel table-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow" data-i18n="administration.keysEyebrow">SIGNATURVERTRAUEN</p>
+                <h3 data-i18n="administration.keys">Schlüssel</h3>
+              </div>
+            </div>
+            <div class="responsive-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th data-i18n="administration.key">Schlüssel</th>
+                    <th data-i18n="administration.device">Gerät</th>
+                    <th data-i18n="administration.algorithm">Algorithmus</th>
+                    <th data-i18n="administration.status">Status</th>
+                    <th data-i18n="administration.actions">Aktionen</th>
+                  </tr>
+                </thead>
+                <tbody id="administration-keys"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
         <section class="view" id="guide" data-title-key="title.guide">
           <div class="section-intro">
             <div>
@@ -432,7 +513,13 @@
     <dialog class="workflow-dialog" id="auth-dialog" aria-labelledby="auth-dialog-title">
       <div class="dialog-shell">
         <div class="panel-header">
-          <h2 id="auth-dialog-title" data-i18n="auth.account">Konto</h2>
+          <div class="auth-heading">
+            <span class="brand-mark" aria-hidden="true">SC</span>
+            <div>
+              <h2 id="auth-dialog-title" data-i18n="auth.account">Konto</h2>
+              <small>SCTracker · Coffee Evidence</small>
+            </div>
+          </div>
           <button class="dialog-close" type="button" aria-label="Schließen" data-i18n-aria-label="common.close">×</button>
         </div>
         <div id="auth-status" role="status" aria-live="polite"></div>
@@ -511,6 +598,6 @@
         SC_TRACKER_AUTH_PROVIDERS: ["google"],
       };
     </script>
-    <script type="module" src="app.js?v=4"></script>
+    <script type="module" src="app.js?v=5"></script>
   </body>
 </html>

@@ -3,11 +3,17 @@ import fp from "fastify-plugin";
 import { authIdentityUuid, createNeonJwtVerifier, type JwtVerifier } from "./auth.js";
 import { AppError } from "./errors.js";
 import type { Config } from "./config.js";
+import { normalizeRoles, rolesFromClaims } from "./identity.js";
 
 export interface ActorContext {
   tenantId: string;
   actorId: string;
   deviceId: string | null;
+  roles: string[];
+  subjectId: string | null;
+  displayName: string | null;
+  email: string | null;
+  authSource: "development" | "jwt";
 }
 
 declare module "fastify" {
@@ -48,6 +54,15 @@ export const actorContext = fp(async (app: FastifyInstance, options: ActorContex
         tenantId,
         actorId,
         deviceId: typeof request.headers["x-device-id"] === "string" ? request.headers["x-device-id"] : null,
+        roles: normalizeRoles(
+          typeof request.headers["x-actor-roles"] === "string"
+            ? request.headers["x-actor-roles"].split(",")
+            : [],
+        ),
+        subjectId: actorId,
+        displayName: null,
+        email: null,
+        authSource: "development",
       };
       return;
     }
@@ -68,6 +83,7 @@ export const actorContext = fp(async (app: FastifyInstance, options: ActorContex
     }
 
     const organizationId = payload.activeOrganizationId;
+    const roles = rolesFromClaims(payload as Record<string, unknown>, organizationId as string);
     if (
       typeof payload.sub !== "string" ||
       payload.sub.length === 0 ||
@@ -82,6 +98,11 @@ export const actorContext = fp(async (app: FastifyInstance, options: ActorContex
       tenantId: authIdentityUuid("organization", organizationId),
       actorId: authIdentityUuid("subject", payload.sub),
       deviceId: typeof request.headers["x-device-id"] === "string" ? request.headers["x-device-id"] : null,
+      roles,
+      subjectId: payload.sub,
+      displayName: typeof payload.name === "string" ? payload.name : null,
+      email: typeof payload.email === "string" ? payload.email : null,
+      authSource: "jwt",
     };
   });
 });

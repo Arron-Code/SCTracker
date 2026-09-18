@@ -17,6 +17,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html {
   scroll-behavior: smooth;
 }
@@ -1266,6 +1270,42 @@ tr:last-child td {
   gap: 14px;
 }
 
+.auth-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.auth-heading h2 {
+  margin: 0;
+}
+
+.auth-heading small {
+  color: var(--muted);
+}
+
+#auth-dialog.auth-gate {
+  width: min(92vw, 560px);
+  max-width: 560px;
+  max-height: min(90vh, 760px);
+  margin: auto;
+  border: 0;
+  border-radius: 20px;
+  box-shadow: 0 28px 90px rgba(20, 37, 29, 0.28);
+}
+
+#auth-dialog.auth-gate::backdrop {
+  background:
+    radial-gradient(circle at 20% 20%, rgba(201, 218, 131, 0.24), transparent 32%),
+    linear-gradient(145deg, #14251d, #1f5a43);
+}
+
+#auth-dialog.auth-gate .dialog-shell {
+  max-height: min(90vh, 760px);
+  overflow-y: auto;
+  padding: clamp(22px, 5vw, 38px);
+}
+
 .auth-form p {
   margin: 0;
   color: var(--muted);
@@ -1296,6 +1336,24 @@ tr:last-child td {
   font: inherit;
   font-weight: 700;
   cursor: pointer;
+}
+
+.text-button.danger {
+  color: var(--red);
+}
+
+.administration-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+#administration .table-panel {
+  margin-bottom: 18px;
+}
+
+#administration table {
+  min-width: 760px;
 }
 
 .auth-form.nested {
@@ -1444,11 +1502,18 @@ tr:last-child td {
 @media (max-width: 520px) {
   .topbar {
     align-items: flex-start;
+    flex-direction: column;
+    gap: 16px;
   }
 
   .topbar-actions {
+    width: 100%;
     flex-wrap: wrap;
-    justify-content: flex-end;
+    justify-content: flex-start;
+  }
+
+  .auth-button {
+    max-width: 100%;
   }
 
   .header-document-link {

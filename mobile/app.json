@@ -4,13 +4,16 @@
     "slug": "sctracker-coffee",
     "scheme": "sctracker",
     "version": "0.2.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "description": "Mobile coffee plot and supplier field application for SCTracker.",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.sctracker.coffee",
+      "entitlements": {
+        "com.apple.developer.devicecheck.appattest-environment": "production"
+      },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "SCTracker uses your location to capture coffee plot coordinates while you are on site.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "SCTracker monitors saved coffee plot geofences and notifies you when entering or leaving them.",

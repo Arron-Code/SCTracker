@@ -20,6 +20,7 @@ const baseConfig: Config = {
   SENTINEL_HUB_BASE_URL: "https://example.invalid",
   S3_FORCE_PATH_STYLE: false,
   S3_OBJECT_LOCK_REQUIRED: true,
+  ATTESTATION_CHALLENGE_TTL_SECONDS: 600,
 };
 
 const providers: Providers = {
@@ -44,6 +45,11 @@ const providers: Providers = {
   },
   dds: {
     async submit() {
+      throw new Error("unused");
+    },
+  },
+  attestation: {
+    async verify() {
       throw new Error("unused");
     },
   },

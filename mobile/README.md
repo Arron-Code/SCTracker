@@ -10,15 +10,19 @@ Expo/React-Native-App für Android und iOS mit vollständiger Oberfläche in Deu
 - editierbarer Kreismittelpunkt und Radius, aus der Plotfläche berechnete Startgröße sowie Hintergrund-Ein-/Austrittsüberwachung
 - persistente, migrationsfähige AsyncStorage-Daten (`v1`-GPS-Entwürfe werden nach `v2` migriert)
 - organisationsgetrennte Offline-Daten und Geofence-Registrierungen
+- zusätzlich benutzergebundene Offline-Speicher-, Geräte- und Signaturschlüssel
 - retry-sichere Push/Pull-Synchronisierung mit UUID-/Idempotency-IDs, Outbox, Inbox-Cursor und sichtbarer Konfliktauflösung
 - Dokument-Upload über Presigned-URL-Initiierung und Abschluss
 - Satellitenanalyse, Evidence-Pack-Anforderung mit Download/Teilen sowie DDS-Entwurf, Validierung, Einreichung und Status
 - sichtbarer Online-/Offline-, Konfigurations- und Synchronisierungsstatus mit manueller Wiederholung
 - Neon Managed Better Auth mit E-Mail-Anmeldung und aktiver Organisation
+- zentrale Geräte- und Signaturschlüsselregistrierung mit Play Integrity bzw. App Attest
+- drehbare, responsive Hoch-/Querformat- und Tablet-Layouts
 
 `NOT_CONFIGURED`, fehlende API-/Auth-URLs und eine fehlende aktive Organisation
-werden immer als blockierende Fehler angezeigt und nie als Erfolg behandelt.
-Offline-Entwürfe und die Outbox bleiben dabei vollständig verfügbar.
+werden immer als blockierende Fehler angezeigt und nie als Erfolg behandelt. Vor
+erfolgreicher Anmeldung und Organisationsauswahl werden keine Fachdaten geladen
+oder angezeigt.
 
 ## Konfiguration
 
@@ -32,6 +36,7 @@ Copy-Item .env.example .env.local
 ```dotenv
 EXPO_PUBLIC_API_URL=http://localhost:3000
 EXPO_PUBLIC_NEON_AUTH_URL=https://your-neon-auth-host.example/neondb/auth
+EXPO_PUBLIC_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=
 ```
 
 Es ist keine Produktions-URL fest eingebaut. Beide URLs sind öffentliche
@@ -56,6 +61,9 @@ Verwendete Endpunkte:
 
 - `POST /api/v1/sync/push`
 - `GET /api/v1/sync/pull?cursor=...`
+- `POST /api/v1/devices/register`
+- `POST /api/v1/devices/attestation/challenges`
+- `POST /api/v1/devices/attestations`
 - `POST /api/v1/plots/:id/geofence/check`
 - `POST /api/v1/documents/uploads`
 - `POST /api/v1/documents/uploads/:id/complete`

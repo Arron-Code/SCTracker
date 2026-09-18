@@ -105,19 +105,19 @@ async function decryptState(encoded: string, scope: string): Promise<PersistedSt
   }
   const plaintext = decryptAuthenticated(
     decodeBase64(envelope.ciphertext),
-    await getStorageKey(),
+    await getStorageKey(scope),
     decodeBase64(envelope.nonce),
     textEncoder.encode(stateKey(scope)),
   );
   const state = normalizeState(JSON.parse(textDecoder.decode(plaintext)) as PersistedState);
-  return { ...state, deviceId: await getDeviceId(state.deviceId) };
+  return { ...state, deviceId: await getDeviceId(state.deviceId, scope) };
 }
 
-async function encryptText(value: string, associatedKey: string): Promise<string> {
+async function encryptText(value: string, associatedKey: string, scope: string): Promise<string> {
   const nonce = await randomBytes(24);
   const ciphertext = encryptAuthenticated(
     textEncoder.encode(value),
-    await getStorageKey(),
+    await getStorageKey(scope),
     nonce,
     textEncoder.encode(associatedKey),
   );
@@ -145,13 +145,13 @@ export async function loadState(scope = "local"): Promise<PersistedState> {
         throw new Error("Unsupported plaintext state version.");
       }
       const migrated = normalizeState(parsed);
-      const secured = { ...migrated, deviceId: await getDeviceId(migrated.deviceId) };
+      const secured = { ...migrated, deviceId: await getDeviceId(migrated.deviceId, scope) };
       await saveState(secured, scope);
       await AsyncStorage.multiRemove([plaintextStateKey(scope), ...(scope === "local" ? [LEGACY_STATE_KEY] : [])]);
       return secured;
     } catch (error) {
       const protectedKey = quarantineKey(scope);
-      await AsyncStorage.setItem(protectedKey, await encryptText(current, protectedKey));
+      await AsyncStorage.setItem(protectedKey, await encryptText(current, protectedKey, scope));
       await AsyncStorage.multiRemove([plaintextStateKey(scope), ...(scope === "local" ? [LEGACY_STATE_KEY] : [])]);
       throw new Error("Legacy local data could not be migrated and was moved to encrypted quarantine.", {
         cause: error,
@@ -173,18 +173,18 @@ export async function loadState(scope = "local"): Promise<PersistedState> {
       createdAt: plot.updatedAt,
       attempts: 0,
     }));
-    state.deviceId = await getDeviceId(state.deviceId);
+    state.deviceId = await getDeviceId(state.deviceId, scope);
     await saveState(state, scope);
     await AsyncStorage.removeItem(LEGACY_PLOTS_KEY);
   }
-  return { ...state, deviceId: await getDeviceId() };
+  return { ...state, deviceId: await getDeviceId(undefined, scope) };
 }
 
 export async function saveState(state: PersistedState, scope = "local"): Promise<void> {
   const write = async () => {
     await AsyncStorage.setItem(
       stateKey(scope),
-      await encryptText(canonicalJson(state), stateKey(scope)),
+      await encryptText(canonicalJson(state), stateKey(scope), scope),
     );
   };
   const previous = saveQueues.get(scope);

@@ -7,8 +7,10 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { z } from "zod";
 import type { Config } from "./config.js";
 import { AppError } from "./errors.js";
+import type { AttestationProviderName, AttestationStatus } from "./identity.js";
 import type { Resource } from "./repository.js";
 
 export interface UploadRequest {
@@ -33,9 +35,40 @@ export interface DdsProvider {
   submit(job: Resource): Promise<{ externalId: string; status: string }>;
 }
 
+export interface AttestationVerificationRequest {
+  tenantId: string;
+  actorId: string;
+  deviceId: string;
+  keyId: string | null;
+  challengeId: string | null;
+  challenge: string;
+  provider: AttestationProviderName;
+  proof: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+}
+
+export interface AttestationVerificationResult {
+  status: AttestationStatus;
+  verified: boolean;
+  reason: string;
+  providerReference: string | null;
+  evidence: Record<string, unknown>;
+}
+
+export interface AttestationProvider {
+  verify(request: AttestationVerificationRequest): Promise<AttestationVerificationResult>;
+}
+
 function notConfigured(provider: string): never {
   throw new AppError("NOT_CONFIGURED", `${provider} provider is not configured`, 503);
 }
+
+const attestationResponseSchema = z.object({
+  verified: z.boolean(),
+  reason: z.string().optional(),
+  providerReference: z.string().nullable().optional(),
+  evidence: z.record(z.string(), z.unknown()).optional(),
+});
 
 export class S3StorageProvider implements StorageProvider {
   private readonly client?: S3Client;
@@ -199,5 +232,66 @@ export class EuInformationSystemV3Provider implements DdsProvider {
     });
     if (!response.ok) throw new AppError("PROVIDER_ERROR", "EU Information System submission failed", 502);
     return (await response.json()) as { externalId: string; status: string };
+  }
+}
+
+export class ProviderBackedAttestationProvider implements AttestationProvider {
+  constructor(private readonly config: Config) {}
+
+  private providerConfig(provider: AttestationProviderName): {
+    label: string;
+    url: string;
+    token: string;
+  } | null {
+    if (provider === "play_integrity") {
+      return this.config.PLAY_INTEGRITY_VERIFY_URL && this.config.PLAY_INTEGRITY_VERIFY_TOKEN
+        ? {
+            label: "Play Integrity",
+            url: this.config.PLAY_INTEGRITY_VERIFY_URL,
+            token: this.config.PLAY_INTEGRITY_VERIFY_TOKEN,
+          }
+        : null;
+    }
+    return this.config.APP_ATTEST_VERIFY_URL && this.config.APP_ATTEST_VERIFY_TOKEN
+      ? {
+          label: "App Attest",
+          url: this.config.APP_ATTEST_VERIFY_URL,
+          token: this.config.APP_ATTEST_VERIFY_TOKEN,
+        }
+      : null;
+  }
+
+  async verify(request: AttestationVerificationRequest): Promise<AttestationVerificationResult> {
+    const target = this.providerConfig(request.provider);
+    if (!target) {
+      return {
+        status: "NOT_CONFIGURED",
+        verified: false,
+        reason: `${request.provider} verifier is not configured`,
+        providerReference: null,
+        evidence: {},
+      };
+    }
+
+    const response = await fetch(target.url, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${target.token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+    if (!response.ok) {
+      throw new AppError("PROVIDER_ERROR", `${target.label} attestation verification failed`, 502);
+    }
+
+    const parsed = attestationResponseSchema.parse(await response.json());
+    return {
+      status: parsed.verified ? "VERIFIED" : "UNVERIFIED",
+      verified: parsed.verified,
+      reason: parsed.reason ?? (parsed.verified ? `${target.label} verified attestation` : `${target.label} did not verify attestation`),
+      providerReference: parsed.providerReference ?? null,
+      evidence: parsed.evidence ?? {},
+    };
   }
 }

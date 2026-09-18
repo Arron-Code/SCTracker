@@ -25,6 +25,7 @@ const config: Config = {
   SENTINEL_HUB_BASE_URL: "https://example.invalid",
   S3_FORCE_PATH_STYLE: false,
   S3_OBJECT_LOCK_REQUIRED: true,
+  ATTESTATION_CHALLENGE_TTL_SECONDS: 600,
 };
 const headers = {
   "x-tenant-id": "00000000-0000-4000-8000-000000000001",
@@ -90,6 +91,29 @@ function signingFixture(options: {
   };
 }
 
+async function registerSigningIdentity(
+  target: MemoryRepository,
+  fixture: ReturnType<typeof signingFixture>,
+  options: {
+    tenantId?: string;
+    actorId?: string;
+  } = {},
+): Promise<void> {
+  const tenantId = options.tenantId ?? headers["x-tenant-id"];
+  const actorId = options.actorId ?? headers["x-actor-id"];
+  await target.upsertOrganizationUser(tenantId, { actorId, roles: [] });
+  await target.registerDevice(tenantId, actorId, {
+    deviceId: fixture.deviceId,
+    displayName: "Field device",
+    platform: "android",
+    appVersion: "1.0.0",
+    osVersion: "14",
+    keyProtection: "strongbox",
+    metadata: {},
+  });
+  await target.registerSigningKey(tenantId, actorId, fixture.deviceId, fixture.deviceKey);
+}
+
 describe("SCTracker API", () => {
   let repository: MemoryRepository;
   let providers: Providers;
@@ -119,6 +143,17 @@ describe("SCTracker API", () => {
       dds: {
         async submit() {
           return { externalId: "EU-123", status: "accepted" };
+        },
+      },
+      attestation: {
+        async verify() {
+          return {
+            status: "NOT_CONFIGURED",
+            verified: false,
+            reason: "play_integrity verifier is not configured",
+            providerReference: null,
+            evidence: {},
+          };
         },
       },
     };
@@ -152,6 +187,33 @@ describe("SCTracker API", () => {
     const response = await app.inject({ method: "GET", url: "/" });
     expect(response.statusCode).toBe(302);
     expect(response.headers.location).toBe("/docs/");
+    await app.close();
+  });
+
+  it("redirects backend administration entry routes to the configured frontend administration view", async () => {
+    const app = await buildApp({
+      config: {
+        ...config,
+        SC_TRACKER_FRONTEND_URL: "https://portal.example.test/app",
+      },
+      repository,
+      providers,
+    });
+    const bare = await app.inject({ method: "GET", url: "/admin" });
+    expect(bare.statusCode).toBe(302);
+    expect(bare.headers.location).toBe("https://portal.example.test/app#administration");
+
+    const withSlash = await app.inject({ method: "GET", url: "/admin/" });
+    expect(withSlash.statusCode).toBe(302);
+    expect(withSlash.headers.location).toBe("https://portal.example.test/app#administration");
+    await app.close();
+  });
+
+  it("falls back to the first configured frontend origin for backend administration entry redirects", async () => {
+    const app = await buildApp({ config, repository, providers });
+    const response = await app.inject({ method: "GET", url: "/admin" });
+    expect(response.statusCode).toBe(302);
+    expect(response.headers.location).toBe("https://app.example.test/#administration");
     await app.close();
   });
 
@@ -235,6 +297,7 @@ describe("SCTracker API", () => {
   it("accepts mobile outbox operations and returns mobile pull changes", async () => {
     const app = await buildApp({ config, repository, providers });
     const mobileFixture = signingFixture();
+    await registerSigningIdentity(repository, mobileFixture);
     const supplierId = "00000000-0000-4000-8000-000000000010";
     const operationId = "00000000-0000-4000-8000-000000000011";
     const initialPayload = {
@@ -272,6 +335,7 @@ describe("SCTracker API", () => {
       const signedRepository = new MemoryRepository();
       const app = await buildApp({ config, repository: signedRepository, providers });
       const fixture = signingFixture();
+      await registerSigningIdentity(signedRepository, fixture);
       const firstPayload = { id: "00000000-0000-4000-8000-000000000020", name: "Signed one" };
       const first = fixture.createEvent(
         "00000000-0000-4000-8000-000000000021",
@@ -384,6 +448,7 @@ describe("SCTracker API", () => {
       const signedRepository = new MemoryRepository();
       const app = await buildApp({ config, repository: signedRepository, providers });
       const fixture = signingFixture();
+      await registerSigningIdentity(signedRepository, fixture);
       const aggregateId = "00000000-0000-4000-8000-000000000030";
       const originalPayload = { id: aggregateId, name: "Original" };
       const event = fixture.createEvent(
@@ -432,6 +497,7 @@ describe("SCTracker API", () => {
       const signedRepository = new MemoryRepository();
       const app = await buildApp({ config, repository: signedRepository, providers });
       const fixture = signingFixture();
+      await registerSigningIdentity(signedRepository, fixture);
       const aggregateId = "00000000-0000-4000-8000-000000000040";
       const payload = { id: aggregateId, name: "Broken chain" };
       const event = fixture.createEvent(
@@ -532,6 +598,7 @@ describe("SCTracker API", () => {
   it("accepts an exact signed-event replay after append but before an idempotency response", async () => {
     const app = await buildApp({ config, repository, providers });
     const fixture = signingFixture();
+    await registerSigningIdentity(repository, fixture);
     const aggregateId = "00000000-0000-4000-8000-000000000050";
     const operationId = "00000000-0000-4000-8000-000000000051";
     const payload = { id: aggregateId, name: "Recovered replay" };
@@ -665,6 +732,7 @@ describe("SCTracker API", () => {
   it("rejects rebinding a device to another key and actor", async () => {
     const app = await buildApp({ config, repository, providers });
     const original = signingFixture();
+    await registerSigningIdentity(repository, original);
     const firstPayload = {
       id: "00000000-0000-4000-8000-000000000080",
       name: "Original binding",

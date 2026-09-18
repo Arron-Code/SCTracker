@@ -1,5 +1,6 @@
 import { ApiError, pullChanges, pushOperations } from "./api";
 import type { OutboxOperation, PersistedState, Plot, Supplier } from "./domain";
+import { ensureDeviceTrustRegistration } from "./device-trust";
 import { sealPendingOperations } from "./event-chain";
 import { getDeviceSigningKey } from "./secure-crypto";
 
@@ -45,6 +46,7 @@ export async function synchronize(
   let ready: OutboxOperation[] = [];
   try {
     if (!identity) throw new Error("An authenticated identity is required to sign synchronization events.");
+    await ensureDeviceTrustRegistration(state.deviceId, identity.actorId, identity.tenantId);
     state = await sealPendingOperations(state, identity.actorId, identity.tenantId);
     if (persist) await persist(state);
     const now = Date.now();
@@ -55,7 +57,7 @@ export async function synchronize(
       if (!force && item.nextAttemptAt && Date.parse(item.nextAttemptAt) > now) break;
       ready.push(item);
     }
-    const deviceKey = await getDeviceSigningKey();
+    const deviceKey = await getDeviceSigningKey(`${identity.tenantId}:${identity.actorId}`);
     for (let offset = 0; offset < ready.length; offset += MAX_PUSH_OPERATIONS) {
       const batch = ready.slice(offset, offset + MAX_PUSH_OPERATIONS);
       const pushed = await pushOperations(state.deviceId, batch, deviceKey);
