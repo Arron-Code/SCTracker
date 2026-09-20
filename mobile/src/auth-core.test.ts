@@ -9,10 +9,18 @@ import {
 } from "./auth-core";
 
 test("mobile Neon Auth URL is runtime-configurable", () => {
-  assert.equal(getNeonAuthUrl({}), null);
+  assert.equal(getNeonAuthUrl(undefined), null);
   assert.equal(
-    getNeonAuthUrl({ EXPO_PUBLIC_NEON_AUTH_URL: "https://auth.example.test/auth/" }),
+    getNeonAuthUrl("https://auth.example.test/auth/"),
     "https://auth.example.test/auth",
+  );
+});
+
+test("mobile auth uses an Expo-inlineable Neon Auth environment access", async () => {
+  const source = await readFile(new URL("./auth.ts", import.meta.url), "utf8");
+  assert.match(
+    source,
+    /getNeonAuthUrl\(process\.env\.EXPO_PUBLIC_NEON_AUTH_URL\)/,
   );
 });
 

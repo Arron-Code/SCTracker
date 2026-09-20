@@ -10,7 +10,7 @@ import {
   type AuthSession,
 } from "./auth-core";
 
-const baseURL = getNeonAuthUrl();
+const baseURL = getNeonAuthUrl(process.env.EXPO_PUBLIC_NEON_AUTH_URL);
 const client = baseURL
   ? createAuthClient({
       baseURL,

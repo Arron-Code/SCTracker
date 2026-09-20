@@ -32,10 +32,8 @@ type TokenClient = {
   }>;
 };
 
-export function getNeonAuthUrl(
-  environment: Record<string, string | undefined> = process.env,
-): string | null {
-  const value = environment.EXPO_PUBLIC_NEON_AUTH_URL?.trim();
+export function getNeonAuthUrl(configuredUrl: string | undefined): string | null {
+  const value = configuredUrl?.trim();
   return value ? value.replace(/\/+$/, "") : null;
 }
 
