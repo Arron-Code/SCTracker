@@ -513,7 +513,13 @@ function clearResources() {
   renderSuppliers();
   renderPlots();
   renderShipments();
-  state.administration = { users: [], devices: [], keys: [], error: null };
+  state.administration = {
+    ...state.administration,
+    users: [],
+    devices: [],
+    keys: [],
+    error: null,
+  };
   renderAdministration();
 }
 
