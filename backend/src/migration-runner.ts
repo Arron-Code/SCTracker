@@ -20,6 +20,30 @@ export async function runMigrations(connectionString: string): Promise<void> {
     `);
     await client.query(`
       DELETE FROM schema_migrations
+      WHERE name = '001_initial.sql'
+        AND to_regclass('public.coffee_plots') IS NULL
+    `);
+    await client.query(`
+      DELETE FROM schema_migrations
+      WHERE name = '002_plot_geofences.sql'
+        AND NOT EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'coffee_plots'
+            AND column_name = 'geofence_center'
+        )
+    `);
+    await client.query(`
+      DELETE FROM schema_migrations
+      WHERE name = '003_signed_events.sql'
+        AND (
+          to_regclass('public.device_signing_keys') IS NULL
+          OR to_regclass('public.signed_events') IS NULL
+        )
+    `);
+    await client.query(`
+      DELETE FROM schema_migrations
       WHERE name = '004_identity_trust_registry.sql'
         AND (
           to_regclass('public.organization_users') IS NULL
