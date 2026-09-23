@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import { File, Paths } from "expo-file-system";
 import * as Location from "expo-location";
+import * as Linking from "expo-linking";
 import * as Sharing from "expo-sharing";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -39,11 +40,14 @@ import {
   getAccessToken,
   getSession,
   listOrganizations,
+  requestPasswordReset,
+  resetPassword,
   setActiveOrganization,
   signIn,
   signOut,
 } from "./src/auth";
 import type { AuthOrganization, AuthSession } from "./src/auth-core";
+import { passwordResetTokenFromUrl } from "./src/auth-core";
 import {
   closePolygon,
   createUuid,
@@ -956,10 +960,29 @@ function AuthCard({
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [resetToken, setResetToken] = useState<string | null>(null);
+  const [resetRequested, setResetRequested] = useState(false);
   const [organizationName, setOrganizationName] = useState("");
   const [organizationSlug, setOrganizationSlug] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    function handleUrl(url: string | null) {
+      const token = passwordResetTokenFromUrl(url);
+      if (token) {
+        setResetToken(token);
+        setPassword("");
+        setConfirmPassword("");
+        setActionError(null);
+      }
+    }
+
+    void Linking.getInitialURL().then(handleUrl);
+    const subscription = Linking.addEventListener("url", ({ url }) => handleUrl(url));
+    return () => subscription.remove();
+  }, []);
 
   async function run(action: () => Promise<unknown>) {
     setSubmitting(true);
@@ -990,6 +1013,37 @@ function AuthCard({
     return <ActivityIndicator size="small" color={palette.forest} />;
   }
 
+  if (resetToken) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>{t.auth.resetPassword}</Text>
+        <Text style={styles.description}>{t.auth.resetPasswordHelp}</Text>
+        <Field label={t.auth.newPassword} value={password} onChangeText={setPassword} secureTextEntry />
+        <Field label={t.auth.confirmPassword} value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry />
+        {actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
+        <Button
+          label={t.auth.resetPassword}
+          icon="key"
+          disabled={submitting || password.length < 8 || password !== confirmPassword}
+          onPress={() => void run(async () => {
+            await resetPassword(password, resetToken);
+            setResetToken(null);
+            setPassword("");
+            setConfirmPassword("");
+            setResetRequested(false);
+          })}
+        />
+        <Button
+          label={t.auth.backToSignIn}
+          icon="arrow-back"
+          secondary
+          disabled={submitting}
+          onPress={() => setResetToken(null)}
+        />
+      </View>
+    );
+  }
+
   if (!session) {
     return (
       <View style={styles.card}>
@@ -1004,6 +1058,20 @@ function AuthCard({
           disabled={submitting}
           onPress={() => void run(() => signIn(email.trim(), password))}
         />
+        <Button
+          label={t.auth.forgotPassword}
+          icon="mail"
+          secondary
+          disabled={submitting || !email.trim()}
+          onPress={() => void run(async () => {
+            await requestPasswordReset(
+              email.trim(),
+              "https://sc-tracker-meloy.vercel.app/mobile-reset.html",
+            );
+            setResetRequested(true);
+          })}
+        />
+        {resetRequested ? <Text style={styles.successText}>{t.auth.resetSent}</Text> : null}
       </View>
     );
   }
@@ -1548,6 +1616,7 @@ const styles = StyleSheet.create({
   blockingTitle: { color: palette.red, fontSize: 12, fontWeight: "900" },
   conflictCard: { gap: 8, padding: 13, borderWidth: 1, borderColor: palette.red, borderRadius: 10, backgroundColor: palette.softRed },
   errorText: { color: palette.red, fontSize: 10, fontWeight: "700" },
+  successText: { color: palette.forest, fontSize: 10, fontWeight: "700" },
   mono: { color: palette.muted, fontFamily: Platform.select({ ios: "Menlo", android: "monospace" }), fontSize: 8, lineHeight: 12 },
   tabs: { minHeight: 70, flexDirection: "row", alignItems: "center", borderTopWidth: 1, borderTopColor: palette.line, backgroundColor: palette.panel },
   tab: { flex: 1, alignItems: "center", gap: 3, paddingHorizontal: 2 },

@@ -42,5 +42,18 @@ export async function tokenFromClient(client: TokenClient): Promise<string | nul
   if (result.error) {
     throw new AuthError("AUTH_ERROR", result.error.message ?? "Could not obtain an access token.");
   }
+
   return result.data?.token ?? null;
+}
+
+export function passwordResetTokenFromUrl(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    const target = parsed.hostname || parsed.pathname.replace(/^\/+/, "");
+    const token = parsed.searchParams.get("token");
+    return target === "reset-password" && token ? token : null;
+  } catch {
+    return null;
+  }
 }

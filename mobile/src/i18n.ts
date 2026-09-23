@@ -113,6 +113,13 @@ export type Translation = {
     accountProvided: string;
     email: string;
     password: string;
+    forgotPassword: string;
+    resetSent: string;
+    resetPassword: string;
+    resetPasswordHelp: string;
+    newPassword: string;
+    confirmPassword: string;
+    backToSignIn: string;
     organization: string;
     organizationRequired: string;
     organizationName: string;
@@ -189,6 +196,9 @@ export const translations = {
       signIn: "Anmelden", signOut: "Abmelden",
       accountProvided: "Konten werden von Ihrer Organisation bereitgestellt.",
       email: "E-Mail", password: "Passwort", organization: "Aktive Organisation",
+      forgotPassword: "Passwort vergessen?", resetSent: "Reset-Link wurde an Ihre E-Mail-Adresse gesendet.",
+      resetPassword: "Passwort zurücksetzen", resetPasswordHelp: "Legen Sie ein neues Passwort mit mindestens 8 Zeichen fest.",
+      newPassword: "Neues Passwort", confirmPassword: "Passwort bestätigen", backToSignIn: "Zurück zur Anmeldung",
       organizationRequired: "Wählen oder erstellen Sie eine Organisation, bevor Sie synchronisieren.",
       organizationName: "Organisationsname", organizationSlug: "Organisationskürzel",
       createOrganization: "Organisation erstellen", notConfigured: "Neon Auth nicht konfiguriert",
@@ -259,6 +269,9 @@ export const translations = {
       signIn: "Sign in", signOut: "Sign out",
       accountProvided: "Accounts are provided by your organization.",
       email: "Email", password: "Password", organization: "Active organization",
+      forgotPassword: "Forgot password?", resetSent: "A reset link was sent to your email address.",
+      resetPassword: "Reset password", resetPasswordHelp: "Choose a new password with at least 8 characters.",
+      newPassword: "New password", confirmPassword: "Confirm password", backToSignIn: "Back to sign in",
       organizationRequired: "Select or create an organization before synchronizing.",
       organizationName: "Organization name", organizationSlug: "Organization slug",
       createOrganization: "Create organization", notConfigured: "Neon Auth not configured",
@@ -329,6 +342,9 @@ export const translations = {
       signIn: "ግባ", signOut: "ውጣ",
       accountProvided: "መለያዎች በድርጅትዎ ይሰጣሉ።",
       email: "ኢሜይል", password: "የይለፍ ቃል", organization: "ንቁ ድርጅት",
+      forgotPassword: "የይለፍ ቃል ረሱ?", resetSent: "የዳግም ማስጀመሪያ ሊንክ ወደ ኢሜይልዎ ተልኳል።",
+      resetPassword: "የይለፍ ቃል ዳግም ያስጀምሩ", resetPasswordHelp: "ቢያንስ 8 ቁምፊ ያለው አዲስ የይለፍ ቃል ይምረጡ።",
+      newPassword: "አዲስ የይለፍ ቃል", confirmPassword: "የይለፍ ቃል ያረጋግጡ", backToSignIn: "ወደ መግቢያ ተመለስ",
       organizationRequired: "ከማመሳሰልዎ በፊት ድርጅት ይምረጡ ወይም ይፍጠሩ።",
       organizationName: "የድርጅት ስም", organizationSlug: "የድርጅት አጭር መለያ",
       createOrganization: "ድርጅት ፍጠር", notConfigured: "Neon Auth አልተዋቀረም",
@@ -399,6 +415,9 @@ export const translations = {
       signIn: "እቶ", signOut: "ውጻእ",
       accountProvided: "መለያታት ብትካልኩም ይወሃቡ።",
       email: "ኢመይል", password: "መሕለፊ ቓል", organization: "ንጡፍ ትካል",
+      forgotPassword: "መሕለፊ ቓል ረሲዕኩም?", resetSent: "መሕለፊ ቓል ንምቕያር መላግቦ ናብ ኢመይልኩም ተላኢኹ።",
+      resetPassword: "መሕለፊ ቓል ቀይሩ", resetPasswordHelp: "እንተወሓደ 8 ፊደላት ዘለዎ ሓድሽ መሕለፊ ቓል ምረጹ።",
+      newPassword: "ሓድሽ መሕለፊ ቓል", confirmPassword: "መሕለፊ ቓል ኣረጋግጹ", backToSignIn: "ናብ መእተዊ ተመለሱ",
       organizationRequired: "ቅድሚ ምትእስሳር ትካል ምረጹ ወይ ፍጠሩ።",
       organizationName: "ስም ትካል", organizationSlug: "ሓጺር መለለዪ ትካል",
       createOrganization: "ትካል ፍጠር", notConfigured: "Neon Auth ኣይተዋቐረን",

@@ -66,6 +66,20 @@ export async function signIn(email: string, password: string) {
   );
 }
 
+export async function requestPasswordReset(email: string, redirectTo: string) {
+  return unwrap(
+    await requireClient().requestPasswordReset({ email, redirectTo }),
+    "Could not send the password reset email.",
+  );
+}
+
+export async function resetPassword(newPassword: string, token: string) {
+  return unwrap(
+    await requireClient().resetPassword({ newPassword, token }),
+    "Could not reset the password.",
+  );
+}
+
 export async function signOut() {
   return unwrap(await requireClient().signOut(), "Sign-out failed.");
 }

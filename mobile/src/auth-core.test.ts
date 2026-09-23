@@ -6,6 +6,7 @@ import {
   AuthError,
   getNeonAuthUrl,
   tokenFromClient,
+  passwordResetTokenFromUrl,
 } from "./auth-core";
 
 test("mobile Neon Auth URL is runtime-configurable", () => {
@@ -53,4 +54,13 @@ test("mobile auth code never persists raw JWTs in AsyncStorage or localStorage",
     sources.join("\n"),
     /(?:localStorage|AsyncStorage)\.setItem\([^)]*(?:token|jwt)/i,
   );
+});
+
+test("mobile reset links expose only reset-password tokens", () => {
+  assert.equal(
+    passwordResetTokenFromUrl("sctracker://reset-password?token=temporary-token"),
+    "temporary-token",
+  );
+  assert.equal(passwordResetTokenFromUrl("sctracker://other?token=temporary-token"), null);
+  assert.equal(passwordResetTokenFromUrl("not-a-url"), null);
 });
