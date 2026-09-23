@@ -6,6 +6,7 @@ import {
   AuthError,
   getNeonAuthUrl,
   tokenFromClient,
+  withSessionToken,
   type AuthOrganization,
   type AuthSession,
 } from "./auth-core";
@@ -13,6 +14,7 @@ import {
 const baseURL = getNeonAuthUrl(process.env.EXPO_PUBLIC_NEON_AUTH_URL);
 const AUTH_REQUEST_TIMEOUT_MS = 15_000;
 const MOBILE_AUTH_ORIGIN = "https://sc-tracker-meloy.vercel.app";
+const AUTH_COOKIE_STORAGE_KEY = "sctracker.auth_cookie";
 const client = baseURL
   ? createAuthClient({
       baseURL,
@@ -87,13 +89,20 @@ export async function getSession(): Promise<AuthSession | null> {
 }
 
 export async function signIn(email: string, password: string) {
-  return unwrap(
+  const result = unwrap(
     await authRequest(
       requireClient().signIn.email({ email, password }),
       "Sign-in timed out. Check your connection and try again.",
     ),
     "Sign-in failed.",
   );
+  if (result && typeof result === "object" && "token" in result && typeof result.token === "string") {
+    await SecureStore.setItemAsync(
+      AUTH_COOKIE_STORAGE_KEY,
+      withSessionToken(SecureStore.getItem(AUTH_COOKIE_STORAGE_KEY), result.token),
+    );
+  }
+  return result;
 }
 
 export async function requestPasswordReset(email: string, redirectTo: string) {

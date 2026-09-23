@@ -25,6 +25,33 @@ export type AuthOrganization = {
   slug: string;
 };
 
+type StoredCookie = {
+  value: string;
+  expires: string | null;
+};
+
+export function withSessionToken(
+  storedCookies: string | null,
+  token: string,
+): string {
+  let cookies: Record<string, StoredCookie> = {};
+  if (storedCookies) {
+    try {
+      const parsed = JSON.parse(storedCookies);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        cookies = parsed as Record<string, StoredCookie>;
+      }
+    } catch {
+      cookies = {};
+    }
+  }
+
+  const sessionCookie = { value: token, expires: null };
+  cookies["better-auth.session_token"] = sessionCookie;
+  cookies["__Secure-better-auth.session_token"] = sessionCookie;
+  return JSON.stringify(cookies);
+}
+
 type TokenClient = {
   token: () => Promise<{
     data?: { token?: string | null } | null;
