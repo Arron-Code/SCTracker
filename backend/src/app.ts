@@ -279,6 +279,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   const allowedOrigins = new Set(options.config.FRONTEND_ORIGINS);
   await app.register(cors, {
     origin: (origin, callback) => callback(null, !origin || allowedOrigins.has(origin)),
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   });
   await app.register(swagger, {
     openapi: {

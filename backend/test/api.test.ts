@@ -229,6 +229,22 @@ describe("SCTracker API", () => {
     });
     expect(allowed.statusCode).toBe(204);
     expect(allowed.headers["access-control-allow-origin"]).toBe("https://app.example.test");
+    expect(allowed.headers["access-control-allow-methods"]).toContain("PUT");
+    expect(allowed.headers["access-control-allow-methods"]).toContain("PATCH");
+
+    const userUpdate = await app.inject({
+      method: "OPTIONS",
+      url: "/api/v1/admin/identity/users/00000000-0000-4000-8000-000000000102",
+      headers: {
+        origin: "https://app.example.test",
+        "access-control-request-method": "PUT",
+        "access-control-request-headers": "authorization,content-type",
+      },
+    });
+    expect(userUpdate.statusCode).toBe(204);
+    expect(userUpdate.headers["access-control-allow-origin"]).toBe("https://app.example.test");
+    expect(userUpdate.headers["access-control-allow-methods"]).toContain("PUT");
+    expect(userUpdate.headers["access-control-allow-headers"]).toContain("authorization");
 
     const denied = await app.inject({
       method: "OPTIONS",
