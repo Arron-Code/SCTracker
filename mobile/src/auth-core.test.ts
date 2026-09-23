@@ -7,7 +7,6 @@ import {
   getNeonAuthUrl,
   tokenFromClient,
   passwordResetTokenFromUrl,
-  withSessionToken,
 } from "./auth-core";
 
 test("mobile Neon Auth URL is runtime-configurable", () => {
@@ -37,20 +36,12 @@ test("mobile auth sends a trusted HTTPS Origin without redirecting email sign-in
     /fetchOptions:\s*\{[\s\S]*Origin: MOBILE_AUTH_ORIGIN,[\s\S]*\}/,
   );
   assert.match(source, /signIn\.email\(\{ email, password \}\)/);
-  assert.match(source, /withSessionToken\(SecureStore\.getItem\(AUTH_COOKIE_STORAGE_KEY\), result\.token\)/);
-});
-
-test("mobile sign-in persists secure and non-secure Better Auth session cookies", () => {
-  const stored = JSON.parse(
-    withSessionToken(
-      JSON.stringify({ existing: { value: "preserved", expires: null } }),
-      "session-token",
-    ),
+  assert.match(
+    source,
+    /SecureStore\.setItemAsync\(AUTH_SESSION_TOKEN_STORAGE_KEY, result\.token\)/,
   );
-
-  assert.equal(stored.existing.value, "preserved");
-  assert.equal(stored["better-auth.session_token"].value, "session-token");
-  assert.equal(stored["__Secure-better-auth.session_token"].value, "session-token");
+  assert.match(source, /SecureStore\.deleteItemAsync\(EXPO_COOKIE_STORAGE_KEY\)/);
+  assert.match(source, /Authorization: `Bearer \$\{sessionToken\}`/);
 });
 
 test("mobile token provider calls token() for each request and surfaces errors", async () => {

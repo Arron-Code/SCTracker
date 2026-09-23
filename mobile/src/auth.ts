@@ -6,7 +6,6 @@ import {
   AuthError,
   getNeonAuthUrl,
   tokenFromClient,
-  withSessionToken,
   type AuthOrganization,
   type AuthSession,
 } from "./auth-core";
@@ -14,7 +13,8 @@ import {
 const baseURL = getNeonAuthUrl(process.env.EXPO_PUBLIC_NEON_AUTH_URL);
 const AUTH_REQUEST_TIMEOUT_MS = 15_000;
 const MOBILE_AUTH_ORIGIN = "https://sc-tracker-meloy.vercel.app";
-const AUTH_COOKIE_STORAGE_KEY = "sctracker.auth_cookie";
+const AUTH_SESSION_TOKEN_STORAGE_KEY = "sctracker.auth_session_token";
+const EXPO_COOKIE_STORAGE_KEY = "sctracker.auth_cookie";
 const client = baseURL
   ? createAuthClient({
       baseURL,
@@ -57,6 +57,13 @@ function unwrap<T>(
 
 export const authConfigured = client !== null;
 
+function authenticatedFetchOptions() {
+  const sessionToken = SecureStore.getItem(AUTH_SESSION_TOKEN_STORAGE_KEY);
+  return sessionToken
+    ? { headers: { Authorization: `Bearer ${sessionToken}` } }
+    : {};
+}
+
 async function authRequest<T>(request: Promise<T>, timeoutMessage: string): Promise<T> {
   let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -75,13 +82,19 @@ async function authRequest<T>(request: Promise<T>, timeoutMessage: string): Prom
 }
 
 export async function getAccessToken(): Promise<string | null> {
-  return tokenFromClient(requireClient());
+  return tokenFromClient({
+    token: () => requireClient().token({
+      fetchOptions: authenticatedFetchOptions(),
+    }),
+  });
 }
 
 export async function getSession(): Promise<AuthSession | null> {
   return unwrap(
     await authRequest(
-      requireClient().getSession(),
+      requireClient().getSession({
+        fetchOptions: authenticatedFetchOptions(),
+      }),
       "The session request timed out. Please try again.",
     ),
     "Could not load the session.",
@@ -97,10 +110,10 @@ export async function signIn(email: string, password: string) {
     "Sign-in failed.",
   );
   if (result && typeof result === "object" && "token" in result && typeof result.token === "string") {
-    await SecureStore.setItemAsync(
-      AUTH_COOKIE_STORAGE_KEY,
-      withSessionToken(SecureStore.getItem(AUTH_COOKIE_STORAGE_KEY), result.token),
-    );
+    await Promise.all([
+      SecureStore.setItemAsync(AUTH_SESSION_TOKEN_STORAGE_KEY, result.token),
+      SecureStore.deleteItemAsync(EXPO_COOKIE_STORAGE_KEY),
+    ]);
   }
   return result;
 }
@@ -126,19 +139,25 @@ export async function resetPassword(newPassword: string, token: string) {
 }
 
 export async function signOut() {
-  return unwrap(
+  const result = unwrap(
     await authRequest(
-      requireClient().signOut(),
+      requireClient().signOut({
+        fetchOptions: authenticatedFetchOptions(),
+      }),
       "Sign-out timed out. Please try again.",
     ),
     "Sign-out failed.",
   );
+  await SecureStore.deleteItemAsync(AUTH_SESSION_TOKEN_STORAGE_KEY);
+  return result;
 }
 
 export async function listOrganizations(): Promise<AuthOrganization[]> {
   return (unwrap(
     await authRequest(
-      requireClient().organization.list(),
+      requireClient().organization.list({
+        fetchOptions: authenticatedFetchOptions(),
+      }),
       "Loading organizations timed out. Please try again.",
     ),
     "Could not load organizations.",
@@ -152,6 +171,7 @@ export async function createOrganization(name: string, slug: string) {
         name,
         slug,
         keepCurrentActiveOrganization: false,
+        fetchOptions: authenticatedFetchOptions(),
       }),
       "Creating the organization timed out. Please try again.",
     ),
@@ -162,7 +182,10 @@ export async function createOrganization(name: string, slug: string) {
 export async function setActiveOrganization(organizationId: string) {
   return unwrap(
     await authRequest(
-      requireClient().organization.setActive({ organizationId }),
+      requireClient().organization.setActive({
+        organizationId,
+        fetchOptions: authenticatedFetchOptions(),
+      }),
       "Selecting the organization timed out. Please try again.",
     ),
     "Could not select the organization.",
