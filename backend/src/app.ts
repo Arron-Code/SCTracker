@@ -10,6 +10,7 @@ import type { JwtVerifier } from "./auth.js";
 import { actorContext } from "./context.js";
 import { AppError, installErrorHandler } from "./errors.js";
 import { geofenceDistanceMeters, geofenceSchema, normalizeGeometry } from "./geo.js";
+import { runMigrations } from "./migration-runner.js";
 import {
   EuInformationSystemV3Provider,
   ProviderBackedAttestationProvider,
@@ -1221,6 +1222,7 @@ let productionApp: Promise<FastifyInstance> | undefined;
 function getProductionApp(): Promise<FastifyInstance> {
   productionApp ??= (async () => {
     const config = loadConfig();
+    await runMigrations(config.DATABASE_URL);
     return buildApp({
       config,
       repository: PgRepository.connect(config.DATABASE_URL),
