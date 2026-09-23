@@ -74,6 +74,7 @@ test("managed auth obtains a fresh access token directly from Neon Auth", async 
 
   assert.equal(await auth.token(), "fresh-jwt");
   assert.equal(calls[0].url, "https://auth.example.test/auth/token");
+  assert.equal(calls[0].init.cache, "no-store");
   assert.equal(calls[0].init.credentials, "include");
 });
 

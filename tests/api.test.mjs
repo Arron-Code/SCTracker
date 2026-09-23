@@ -51,6 +51,28 @@ test("API errors preserve the provider code and never become success data", asyn
   );
 });
 
+test("API authentication failures notify the application auth gate", async () => {
+  let unauthorizedCalls = 0;
+  const client = createApiClient({
+    config: { apiUrl: "/api/v1" },
+    tokenProvider: async () => "expired-jwt",
+    onUnauthorized: async () => {
+      unauthorizedCalls += 1;
+    },
+    fetchImpl: async () =>
+      jsonResponse(
+        { error: { code: "UNAUTHENTICATED", message: "A valid bearer token is required" } },
+        401,
+      ),
+  });
+
+  await assert.rejects(
+    client.administration.users(),
+    (error) => error instanceof ApiError && error.code === "UNAUTHENTICATED",
+  );
+  assert.equal(unauthorizedCalls, 1);
+});
+
 test("resource and job requests use the documented endpoints and JSON shapes", async () => {
   const calls = [];
   const client = createApiClient({

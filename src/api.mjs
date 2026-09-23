@@ -117,6 +117,7 @@ export function createApiClient(options = {}) {
   const config = getRuntimeConfig(options.config);
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const tokenProvider = options.tokenProvider;
+  const onUnauthorized = options.onUnauthorized;
   const mock = config.mockApi ? createMockTransport(options.mockStore) : null;
 
   async function request(path, init = {}) {
@@ -141,6 +142,9 @@ export function createApiClient(options = {}) {
       headers.set("content-type", "application/json");
     }
     const response = await fetchImpl(`${config.apiUrl}${path}`, { ...init, headers });
+    if (response.status === 401 && onUnauthorized) {
+      await onUnauthorized();
+    }
     return parseResponse(response);
   }
 

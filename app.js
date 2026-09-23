@@ -1,15 +1,18 @@
-import { createApiClient, ApiError } from "./src/api.mjs?v=3";
-import { createManagedAuth, AuthError } from "./src/auth.mjs?v=4";
+import { createApiClient, ApiError } from "./src/api.mjs?v=4";
+import { createManagedAuth, AuthError } from "./src/auth.mjs?v=5";
 import { calculateCompletion, validateMassBalance } from "./src/domain.mjs?v=1";
 import { parseGeoJson } from "./src/geojson.mjs?v=2";
 import {
   SUPPORTED_LANGUAGES,
   applyTranslations,
   translate,
-} from "./src/i18n.mjs?v=3";
+} from "./src/i18n.mjs?v=4";
 
 const auth = createManagedAuth();
-const api = createApiClient({ tokenProvider: () => auth.token() });
+const api = createApiClient({
+  tokenProvider: () => auth.token(),
+  onUnauthorized: handleUnauthorized,
+});
 const completion = calculateCompletion({
   supplier: true,
   plots: true,
@@ -523,6 +526,15 @@ function clearResources() {
   renderAdministration();
 }
 
+function handleUnauthorized() {
+  authState.session = null;
+  authState.organizations = [];
+  authState.error = new AuthError("AUTH_REQUIRED", t("auth.sessionExpired"));
+  clearResources();
+  if (dialog.open) dialog.close();
+  renderAuth();
+}
+
 async function loadResources() {
   const supplierTarget = document.querySelector("#supplier-rows");
   const shipmentTarget = document.querySelector("#shipment-rows");
@@ -949,20 +961,21 @@ function openDialog(name, context) {
 async function submitDialog(event) {
   if (event.submitter !== dialogSubmit || !activeDialog) return;
   event.preventDefault();
+  const submission = activeDialog;
   const formElement = event.currentTarget;
   if (!formElement.reportValidity()) return;
   dialogError.textContent = "";
   dialogSubmit.disabled = true;
   dialogSubmit.textContent = t("common.saving");
   try {
-    await activeDialog.execute(new FormData(formElement), activeDialog.context);
+    await submission.execute(new FormData(formElement), submission.context);
     dialog.close();
-    showToast(t(activeDialog.success));
-    await activeDialog.refresh?.();
+    showToast(t(submission.success));
+    await submission.refresh?.();
   } catch (error) {
     dialogError.textContent = errorMessage(error);
     dialogSubmit.disabled = false;
-    dialogSubmit.textContent = t(activeDialog.submit);
+    dialogSubmit.textContent = t(submission.submit);
   }
 }
 

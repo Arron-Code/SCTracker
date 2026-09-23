@@ -39,6 +39,7 @@ function unwrap(result, fallbackMessage) {
 
 async function fetchAuthJson(fetchImpl, url, fallbackMessage) {
   const response = await fetchImpl(url, {
+    cache: "no-store",
     credentials: "include",
     headers: { accept: "application/json" },
   });
