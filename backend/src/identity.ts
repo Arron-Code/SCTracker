@@ -214,6 +214,10 @@ export function rolesFromClaims(payload: Record<string, unknown>, activeOrganiza
     collectStringRoles(mapping[activeOrganizationId], roles);
   }
 
+  if (roles.delete("admin")) {
+    roles.add(ADMIN_ROLE);
+  }
+  roles.delete("authenticated");
   return [...roles].sort();
 }
 

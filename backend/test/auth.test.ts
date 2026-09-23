@@ -204,6 +204,7 @@ describe("Neon Managed Better Auth", () => {
       headers: { authorization: ["Bearer", "valid"].join(" ") },
     });
     expect(response.statusCode).toBe(200);
+    expect(response.json().data[0].roles).toEqual(["organization_admin"]);
     await app.close();
   }, 120_000);
 
