@@ -260,6 +260,54 @@ describe("identity and trust backend", () => {
     await app.close();
   });
 
+  it("protects the last active organization administrator from lockout", async () => {
+    await repository.upsertOrganizationUser(tenantId, {
+      actorId,
+      displayName: "Only admin",
+      roles: ["organization_admin"],
+      status: "active",
+    });
+    const app = await buildApp({ config, repository, providers });
+    const demote = await app.inject({
+      method: "PUT",
+      url: `/api/v1/admin/users/${actorId}`,
+      headers: adminHeaders,
+      payload: { roles: ["operator"], status: "active" },
+    });
+    expect(demote.statusCode).toBe(409);
+    expect(demote.json().error.code).toBe("LAST_ADMIN_REQUIRED");
+
+    const suspendTrust = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/admin/users/${actorId}/trust`,
+      headers: adminHeaders,
+      payload: {
+        state: "SUSPENDED",
+        reason: "access review",
+        details: {},
+      },
+    });
+    expect(suspendTrust.statusCode).toBe(409);
+    expect(suspendTrust.json().error.code).toBe("LAST_ADMIN_REQUIRED");
+
+    const secondAdminId = "00000000-0000-4000-8000-000000000166";
+    await repository.upsertOrganizationUser(tenantId, {
+      actorId: secondAdminId,
+      displayName: "Backup admin",
+      roles: ["organization_admin"],
+      status: "active",
+    });
+    const allowed = await app.inject({
+      method: "PUT",
+      url: `/api/v1/admin/users/${actorId}`,
+      headers: adminHeaders,
+      payload: { roles: ["operator"], status: "active" },
+    });
+    expect(allowed.statusCode).toBe(200);
+    expect(allowed.json().data.roles).toEqual(["operator"]);
+    await app.close();
+  });
+
   it("updates user trust through the standardized admin route", async () => {
     await repository.upsertOrganizationUser(tenantId, {
       actorId,

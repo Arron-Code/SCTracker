@@ -1,4 +1,4 @@
-import { createApiClient, ApiError } from "./src/api.mjs?v=2";
+import { createApiClient, ApiError } from "./src/api.mjs?v=3";
 import { createManagedAuth, AuthError } from "./src/auth.mjs?v=2";
 import { calculateCompletion, validateMassBalance } from "./src/domain.mjs?v=1";
 import { parseGeoJson } from "./src/geojson.mjs?v=2";
@@ -6,7 +6,7 @@ import {
   SUPPORTED_LANGUAGES,
   applyTranslations,
   translate,
-} from "./src/i18n.mjs?v=2";
+} from "./src/i18n.mjs?v=3";
 
 const auth = createManagedAuth();
 const api = createApiClient({ tokenProvider: () => auth.token() });
@@ -40,6 +40,11 @@ const state = {
     devices: [],
     keys: [],
     error: null,
+    userSearch: "",
+    userStatus: "",
+    deviceSearch: "",
+    deviceStatus: "",
+    devicePlatform: "",
   },
 };
 const views = [...document.querySelectorAll(".view")];
@@ -78,6 +83,20 @@ const administrationDevices = document.querySelector("#administration-devices");
 const administrationKeys = document.querySelector("#administration-keys");
 const administrationError = document.querySelector("#administration-error");
 const administrationRefresh = document.querySelector("#administration-refresh");
+const administrationAddUser = document.querySelector("#administration-add-user");
+const administrationUserSearch = document.querySelector("#administration-user-search");
+const administrationUserStatusFilter = document.querySelector("#administration-user-status-filter");
+const administrationDeviceSearch = document.querySelector("#administration-device-search");
+const administrationDeviceStatusFilter = document.querySelector("#administration-device-status-filter");
+const administrationDevicePlatformFilter = document.querySelector("#administration-device-platform-filter");
+const administrationUserCount = document.querySelector("#administration-user-count");
+const administrationActiveUserCount = document.querySelector("#administration-active-user-count");
+const administrationDeviceCount = document.querySelector("#administration-device-count");
+const administrationTrustedDeviceCount = document.querySelector("#administration-trusted-device-count");
+const administrationKeyCount = document.querySelector("#administration-key-count");
+const administrationRevokedKeyCount = document.querySelector("#administration-revoked-key-count");
+const administrationDeviceDialog = document.querySelector("#administration-device-dialog");
+const administrationDeviceDialogContent = document.querySelector("#administration-device-dialog-content");
 let activeDialog;
 let activeLanguage = getInitialLanguage();
 let toastTimer;
@@ -262,32 +281,124 @@ function administrationActions(scope, id, stateValue) {
     </div>`;
 }
 
+function statusBadge(value) {
+  const normalized = String(value ?? "UNVERIFIED").toLowerCase();
+  const badgeClass = ["active", "verified", "organization_verified", "locally_trusted"].includes(normalized)
+    ? "success"
+    : ["pending", "not_configured"].includes(normalized)
+      ? "warning"
+      : ["suspended", "revoked"].includes(normalized)
+        ? "danger"
+        : "neutral";
+  return `<span class="badge ${badgeClass}">${escapeHtml(value ?? "UNVERIFIED")}</span>`;
+}
+
+function formatAdministrationDate(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf())
+    ? String(value)
+    : new Intl.DateTimeFormat(activeLanguage, { dateStyle: "medium", timeStyle: "short" }).format(date);
+}
+
+function administrationUserActions(user) {
+  const nextStatus = user.status === "suspended" ? "active" : "suspended";
+  return `
+    <div class="administration-actions">
+      <button class="text-button" type="button" data-edit-user="${escapeHtml(user.actorId)}">${escapeHtml(t("administration.edit"))}</button>
+      <button class="text-button ${nextStatus === "suspended" ? "danger" : ""}" type="button" data-user-status="${nextStatus}" data-user-id="${escapeHtml(user.actorId)}">
+        ${escapeHtml(t(nextStatus === "suspended" ? "administration.suspend" : "administration.activate"))}
+      </button>
+      ${administrationActions("user", user.actorId, user.trustState)}
+    </div>`;
+}
+
+function administrationDeviceActions(device) {
+  const statusActions = [];
+  if (device.status === "pending" || device.status === "suspended") {
+    statusActions.push(`<button class="text-button" type="button" data-device-status="active" data-device-id="${escapeHtml(device.deviceId)}">${escapeHtml(t("administration.activate"))}</button>`);
+  }
+  if (device.status === "active" || device.status === "pending") {
+    statusActions.push(`<button class="text-button danger" type="button" data-device-status="suspended" data-device-id="${escapeHtml(device.deviceId)}">${escapeHtml(t("administration.suspend"))}</button>`);
+  }
+  if (device.status !== "revoked") {
+    statusActions.push(`<button class="text-button danger" type="button" data-device-status="revoked" data-device-id="${escapeHtml(device.deviceId)}">${escapeHtml(t("administration.revoke"))}</button>`);
+  }
+  return `
+    <div class="administration-actions">
+      <button class="text-button" type="button" data-device-details="${escapeHtml(device.deviceId)}">${escapeHtml(t("administration.details"))}</button>
+      ${statusActions.join("")}
+      ${device.status === "revoked" ? "" : administrationActions("device", device.deviceId, device.trustState)}
+    </div>`;
+}
+
 function renderAdministration() {
   administrationError.hidden = !state.administration.error;
   administrationError.textContent = state.administration.error
     ? errorMessage(state.administration.error)
     : "";
   const { users, devices, keys } = state.administration;
-  administrationUsers.innerHTML = users.length === 0
+  const trustedStates = new Set(["LOCALLY_TRUSTED", "ORGANIZATION_VERIFIED"]);
+  administrationUserCount.textContent = String(users.length);
+  administrationActiveUserCount.textContent = t("administration.activeCount")
+    .replace("{count}", String(users.filter((user) => user.status === "active").length));
+  administrationDeviceCount.textContent = String(devices.length);
+  administrationTrustedDeviceCount.textContent = t("administration.trustedCount")
+    .replace("{count}", String(devices.filter((device) => trustedStates.has(device.trustState)).length));
+  administrationKeyCount.textContent = String(keys.filter((key) => key.status === "active").length);
+  administrationRevokedKeyCount.textContent = t("administration.revokedCount")
+    .replace("{count}", String(keys.filter((key) => key.status === "revoked").length));
+
+  const userQuery = state.administration.userSearch.toLowerCase();
+  const visibleUsers = users.filter((user) => {
+    const matchesQuery = !userQuery || [
+      user.displayName,
+      user.email,
+      user.actorId,
+      ...(user.roles ?? []),
+    ].some((value) => String(value ?? "").toLowerCase().includes(userQuery));
+    return matchesQuery && (!state.administration.userStatus || user.status === state.administration.userStatus);
+  });
+  administrationUsers.innerHTML = visibleUsers.length === 0
     ? `<tr><td colspan="5"><div class="resource-state">${escapeHtml(t("administration.emptyUsers"))}</div></td></tr>`
-    : users.map((user) => `
+    : visibleUsers.map((user) => `
       <tr>
-        <td><strong>${escapeHtml(user.displayName ?? user.email ?? user.actorId)}</strong><small>${escapeHtml(user.email ?? user.actorId)}</small></td>
-        <td>${escapeHtml((user.roles ?? []).join(", ") || "—")}</td>
-        <td><span class="badge neutral">${escapeHtml(user.trustState ?? user.status ?? "UNVERIFIED")}</span></td>
-        <td>${escapeHtml(user.lastAuthenticatedAt ?? "—")}</td>
-        <td>${administrationActions("user", user.actorId, user.trustState)}</td>
+        <td><div class="administration-identity"><strong>${escapeHtml(user.displayName ?? user.email ?? user.actorId)}</strong><small>${escapeHtml(user.email ?? user.actorId)}</small></div></td>
+        <td><div class="administration-role-list">${(user.roles ?? []).length ? user.roles.map((role) => `<span class="administration-role">${escapeHtml(role.replaceAll("_", " "))}</span>`).join("") : "—"}</div></td>
+        <td>${statusBadge(user.status)} ${user.trustState ? statusBadge(user.trustState) : ""}</td>
+        <td>${escapeHtml(formatAdministrationDate(user.lastAuthenticatedAt))}</td>
+        <td>${administrationUserActions(user)}</td>
       </tr>`).join("");
-  administrationDevices.innerHTML = devices.length === 0
-    ? `<tr><td colspan="5"><div class="resource-state">${escapeHtml(t("administration.emptyDevices"))}</div></td></tr>`
-    : devices.map((device) => `
+
+  const deviceQuery = state.administration.deviceSearch.toLowerCase();
+  const visibleDevices = devices.filter((device) => {
+    const owner = users.find((user) => user.actorId === device.actorId);
+    const matchesQuery = !deviceQuery || [
+      device.displayName,
+      device.deviceId,
+      device.platform,
+      device.actorId,
+      owner?.displayName,
+      owner?.email,
+    ].some((value) => String(value ?? "").toLowerCase().includes(deviceQuery));
+    return matchesQuery
+      && (!state.administration.deviceStatus || device.status === state.administration.deviceStatus)
+      && (!state.administration.devicePlatform || device.platform === state.administration.devicePlatform);
+  });
+  administrationDevices.innerHTML = visibleDevices.length === 0
+    ? `<tr><td colspan="6"><div class="resource-state">${escapeHtml(t("administration.emptyDevices"))}</div></td></tr>`
+    : visibleDevices.map((device) => {
+      const owner = users.find((user) => user.actorId === device.actorId);
+      return `
       <tr>
-        <td><strong>${escapeHtml(device.displayName)}</strong><small>${escapeHtml(device.deviceId)}</small></td>
-        <td>${escapeHtml(device.platform)} · ${escapeHtml(device.appVersion)}</td>
-        <td><span class="badge neutral">${escapeHtml(device.trustState ?? device.status)}</span></td>
-        <td><span class="badge neutral">${escapeHtml(device.attestationStatus ?? t("administration.notAttested"))}</span><small>${escapeHtml(device.lastAttestedAt ?? "—")}</small></td>
-        <td>${administrationActions("device", device.deviceId, device.trustState)}</td>
-      </tr>`).join("");
+        <td><div class="administration-identity"><strong>${escapeHtml(device.displayName)}</strong><small>${escapeHtml(device.deviceId)}</small></div></td>
+        <td><div class="administration-identity"><strong>${escapeHtml(owner?.displayName ?? owner?.email ?? t("administration.unknownOwner"))}</strong><small>${escapeHtml(owner?.email ?? device.actorId)}</small></div></td>
+        <td><strong>${escapeHtml(device.platform)}</strong><small class="administration-device-meta">${escapeHtml(device.appVersion)} · ${escapeHtml(device.osVersion)}</small></td>
+        <td>${statusBadge(device.status)} ${device.trustState ? statusBadge(device.trustState) : ""}</td>
+        <td>${statusBadge(device.attestationStatus ?? t("administration.notAttested"))}<small class="administration-device-meta">${escapeHtml(formatAdministrationDate(device.lastAttestedAt))}</small></td>
+        <td>${administrationDeviceActions(device)}</td>
+      </tr>`;
+    }).join("");
   administrationKeys.innerHTML = keys.length === 0
     ? `<tr><td colspan="5"><div class="resource-state">${escapeHtml(t("administration.emptyKeys"))}</div></td></tr>`
     : keys.map((key) => `
@@ -295,11 +406,70 @@ function renderAdministration() {
         <td><strong>${escapeHtml(key.keyId)}</strong><small>${escapeHtml(key.actorId)}</small></td>
         <td>${escapeHtml(key.deviceId)}</td>
         <td>${escapeHtml(key.algorithm)}</td>
-        <td><span class="badge ${key.status === "revoked" ? "danger" : "neutral"}">${escapeHtml(key.status)}</span></td>
+        <td>${statusBadge(key.status)}</td>
         <td>
           ${key.status === "revoked" ? "—" : `<button class="text-button danger" type="button" data-revoke-key="${escapeHtml(key.keyId)}">${escapeHtml(t("administration.revoke"))}</button>`}
         </td>
       </tr>`).join("");
+}
+
+async function showDeviceDetails(deviceId) {
+  const device = state.administration.devices.find((item) => item.deviceId === deviceId);
+  if (!device) return;
+  const owner = state.administration.users.find((user) => user.actorId === device.actorId);
+  const deviceKeys = state.administration.keys.filter((key) => key.deviceId === deviceId);
+  administrationDeviceDialogContent.innerHTML = `<div class="resource-state loading">${escapeHtml(t("common.loading"))}</div>`;
+  administrationDeviceDialog.showModal();
+  try {
+    const [attestations, trustHistory] = await Promise.all([
+      api.administration.deviceAttestations(deviceId),
+      api.administration.trustHistory("device", deviceId),
+    ]);
+    const records = attestations.data?.records ?? [];
+    administrationDeviceDialogContent.innerHTML = `
+      <dl class="administration-detail-grid">
+        <div><dt>${escapeHtml(t("administration.device"))}</dt><dd>${escapeHtml(device.displayName)}</dd></div>
+        <div><dt>${escapeHtml(t("administration.owner"))}</dt><dd>${escapeHtml(owner?.displayName ?? owner?.email ?? device.actorId)}</dd></div>
+        <div><dt>${escapeHtml(t("administration.platform"))}</dt><dd>${escapeHtml(device.platform)} · ${escapeHtml(device.osVersion)}</dd></div>
+        <div><dt>${escapeHtml(t("administration.appVersion"))}</dt><dd>${escapeHtml(device.appVersion)}</dd></div>
+        <div><dt>${escapeHtml(t("administration.keyProtection"))}</dt><dd>${escapeHtml(device.keyProtection)}</dd></div>
+        <div><dt>${escapeHtml(t("administration.lastSeenDevice"))}</dt><dd>${escapeHtml(formatAdministrationDate(device.lastSeenAt))}</dd></div>
+        <div><dt>${escapeHtml(t("administration.status"))}</dt><dd>${statusBadge(device.status)}</dd></div>
+        <div><dt>${escapeHtml(t("administration.trustState"))}</dt><dd>${statusBadge(device.trustState)}</dd></div>
+      </dl>
+      <section class="administration-detail-section">
+        <h3>${escapeHtml(t("administration.attestationHistory"))}</h3>
+        <div class="administration-detail-list">
+          ${records.length ? records.map((record) => `
+            <div class="administration-detail-item">
+              <div><strong>${escapeHtml(record.provider)}</strong><small>${escapeHtml(formatAdministrationDate(record.createdAt))}</small></div>
+              <div>${statusBadge(record.status)}<small>${escapeHtml(record.reason ?? "")}</small></div>
+            </div>`).join("") : `<div class="resource-state">${escapeHtml(t("administration.noAttestations"))}</div>`}
+        </div>
+      </section>
+      <section class="administration-detail-section">
+        <h3>${escapeHtml(t("administration.deviceKeys"))}</h3>
+        <div class="administration-detail-list">
+          ${deviceKeys.length ? deviceKeys.map((key) => `
+            <div class="administration-detail-item">
+              <div><strong>${escapeHtml(key.keyId)}</strong><small>${escapeHtml(key.algorithm)}</small></div>
+              <div>${statusBadge(key.status)}${key.status === "active" ? `<button class="text-button danger" type="button" data-revoke-key="${escapeHtml(key.keyId)}">${escapeHtml(t("administration.revoke"))}</button>` : ""}</div>
+            </div>`).join("") : `<div class="resource-state">${escapeHtml(t("administration.emptyKeys"))}</div>`}
+        </div>
+      </section>
+      <section class="administration-detail-section">
+        <h3>${escapeHtml(t("administration.trustHistory"))}</h3>
+        <div class="administration-detail-list">
+          ${(trustHistory.data ?? []).length ? trustHistory.data.map((entry) => `
+            <div class="administration-detail-item">
+              <div><strong>${escapeHtml(entry.state)}</strong><small>${escapeHtml(formatAdministrationDate(entry.createdAt))}</small></div>
+              <small>${escapeHtml(entry.reason)}</small>
+            </div>`).join("") : `<div class="resource-state">${escapeHtml(t("administration.noTrustHistory"))}</div>`}
+        </div>
+      </section>`;
+  } catch (error) {
+    administrationDeviceDialogContent.innerHTML = `<div class="resource-state error">${escapeHtml(errorMessage(error))}</div>`;
+  }
 }
 
 async function loadAdministration() {
@@ -635,6 +805,66 @@ const dialogDefinitions = {
     },
     success: "success.dds",
   },
+  adminUser: {
+    title: "dialog.adminUser",
+    submit: "common.save",
+    content: (actorId) => {
+      const user = state.administration.users.find((item) => item.actorId === actorId);
+      const roles = new Set(user?.roles ?? ["viewer"]);
+      const roleOptions = [
+        ["organization_admin", "administration.roleAdmin"],
+        ["compliance_manager", "administration.roleCompliance"],
+        ["operator", "administration.roleOperator"],
+        ["auditor", "administration.roleAuditor"],
+        ["viewer", "administration.roleViewer"],
+      ];
+      return `
+        <label>
+          <span>${escapeHtml(t("administration.actorId"))}</span>
+          <input name="actorId" required pattern="[0-9a-fA-F-]{36}" value="${escapeHtml(user?.actorId ?? "")}" ${user ? "readonly" : ""}>
+          <small>${escapeHtml(t("administration.actorIdHelp"))}</small>
+        </label>
+        <label>
+          <span>${escapeHtml(t("form.name"))}</span>
+          <input name="displayName" required maxlength="200" value="${escapeHtml(user?.displayName ?? "")}">
+        </label>
+        <label>
+          <span>${escapeHtml(t("form.email"))}</span>
+          <input name="email" type="email" required value="${escapeHtml(user?.email ?? "")}">
+        </label>
+        <fieldset>
+          <legend>${escapeHtml(t("administration.roles"))}</legend>
+          <div class="administration-role-options">
+            ${roleOptions.map(([role, label]) => `
+              <label class="radio-field">
+                <input type="checkbox" name="roles" value="${role}" ${roles.has(role) ? "checked" : ""}>
+                <span>${escapeHtml(t(label))}</span>
+              </label>`).join("")}
+          </div>
+        </fieldset>
+        <label>
+          <span>${escapeHtml(t("administration.status"))}</span>
+          <select name="status">
+            <option value="active" ${user?.status !== "suspended" ? "selected" : ""}>${escapeHtml(t("administration.active"))}</option>
+            <option value="suspended" ${user?.status === "suspended" ? "selected" : ""}>${escapeHtml(t("administration.suspended"))}</option>
+          </select>
+        </label>`;
+    },
+    execute: (form) => {
+      const roles = form.getAll("roles");
+      if (roles.length === 0) {
+        throw new ApiError("VALIDATION_ERROR", t("administration.roleRequired"), undefined, 400);
+      }
+      return api.administration.saveUser(form.get("actorId").trim(), {
+        displayName: form.get("displayName").trim(),
+        email: form.get("email").trim(),
+        roles,
+        status: form.get("status"),
+      });
+    },
+    success: "success.adminUser",
+    refresh: loadAdministration,
+  },
 };
 
 async function pollJob(getJob, initial) {
@@ -673,11 +903,12 @@ function renderJobStatus(target, job) {
   target.innerHTML = `<strong>${escapeHtml(t("common.status"))}: ${escapeHtml(job.status ?? "—")}</strong>${download}`;
 }
 
-function openDialog(name) {
-  activeDialog = dialogDefinitions[name];
+function openDialog(name, context) {
+  const definition = dialogDefinitions[name];
+  activeDialog = definition ? { ...definition, context } : null;
   if (!activeDialog) return;
   dialogTitle.textContent = t(activeDialog.title);
-  dialogContent.innerHTML = activeDialog.content();
+  dialogContent.innerHTML = activeDialog.content(context);
   dialogError.textContent = "";
   dialogSubmit.textContent = t(activeDialog.submit);
   dialogSubmit.disabled = false;
@@ -694,7 +925,7 @@ async function submitDialog(event) {
   dialogSubmit.disabled = true;
   dialogSubmit.textContent = t("common.saving");
   try {
-    await activeDialog.execute(new FormData(formElement));
+    await activeDialog.execute(new FormData(formElement), activeDialog.context);
     dialog.close();
     showToast(t(activeDialog.success));
     await activeDialog.refresh?.();
@@ -715,7 +946,104 @@ document.querySelectorAll("[data-dialog]").forEach((button) =>
   button.addEventListener("click", () => openDialog(button.dataset.dialog)),
 );
 administrationRefresh.addEventListener("click", () => void loadAdministration());
+administrationAddUser.addEventListener("click", () => openDialog("adminUser"));
+administrationUserSearch.addEventListener("input", () => {
+  state.administration.userSearch = administrationUserSearch.value.trim();
+  renderAdministration();
+});
+administrationUserStatusFilter.addEventListener("change", () => {
+  state.administration.userStatus = administrationUserStatusFilter.value;
+  renderAdministration();
+});
+administrationDeviceSearch.addEventListener("input", () => {
+  state.administration.deviceSearch = administrationDeviceSearch.value.trim();
+  renderAdministration();
+});
+administrationDeviceStatusFilter.addEventListener("change", () => {
+  state.administration.deviceStatus = administrationDeviceStatusFilter.value;
+  renderAdministration();
+});
+administrationDevicePlatformFilter.addEventListener("change", () => {
+  state.administration.devicePlatform = administrationDevicePlatformFilter.value;
+  renderAdministration();
+});
+
+async function revokeAdministrationKey(keyId, button) {
+  const reason = window.prompt(t("administration.revokeReasonPrompt"));
+  if (!reason?.trim()) return;
+  button.disabled = true;
+  try {
+    await api.administration.revokeKey(keyId, reason.trim());
+    await loadAdministration();
+    if (administrationDeviceDialog.open) {
+      administrationDeviceDialog.close();
+    }
+    showToast(t("success.keyRevoked"));
+  } catch (error) {
+    state.administration.error = error;
+    renderAdministration();
+  } finally {
+    button.disabled = false;
+  }
+}
+
 document.querySelector("#administration").addEventListener("click", (event) => {
+  const editUserButton = event.target.closest("[data-edit-user]");
+  if (editUserButton) {
+    openDialog("adminUser", editUserButton.dataset.editUser);
+    return;
+  }
+  const userStatusButton = event.target.closest("[data-user-status]");
+  if (userStatusButton) {
+    const user = state.administration.users.find((item) => item.actorId === userStatusButton.dataset.userId);
+    if (!user) return;
+    const reason = window.prompt(t("administration.statusReasonPrompt"));
+    if (!reason?.trim()) return;
+    userStatusButton.disabled = true;
+    void api.administration.saveUser(user.actorId, {
+      ...(user.displayName ? { displayName: user.displayName } : {}),
+      ...(user.email ? { email: user.email } : {}),
+      roles: user.roles ?? [],
+      status: userStatusButton.dataset.userStatus,
+    }).then(() => api.administration.setUserTrust(user.actorId, {
+      state: userStatusButton.dataset.userStatus === "suspended" ? "SUSPENDED" : "UNVERIFIED",
+      reason: reason.trim(),
+      details: { source: "user_status_change" },
+    })).then(async () => {
+      await loadAdministration();
+      showToast(t("success.userStatus"));
+    }).catch((error) => {
+      state.administration.error = error;
+      renderAdministration();
+    }).finally(() => {
+      userStatusButton.disabled = false;
+    });
+    return;
+  }
+  const deviceDetailsButton = event.target.closest("[data-device-details]");
+  if (deviceDetailsButton) {
+    void showDeviceDetails(deviceDetailsButton.dataset.deviceDetails);
+    return;
+  }
+  const deviceStatusButton = event.target.closest("[data-device-status]");
+  if (deviceStatusButton) {
+    const reason = window.prompt(t("administration.statusReasonPrompt"));
+    if (!reason?.trim()) return;
+    deviceStatusButton.disabled = true;
+    void api.administration.setDeviceStatus(deviceStatusButton.dataset.deviceId, {
+      status: deviceStatusButton.dataset.deviceStatus,
+      reason: reason.trim(),
+    }).then(async () => {
+      await loadAdministration();
+      showToast(t("success.deviceStatus"));
+    }).catch((error) => {
+      state.administration.error = error;
+      renderAdministration();
+    }).finally(() => {
+      deviceStatusButton.disabled = false;
+    });
+    return;
+  }
   const trustButton = event.target.closest("[data-trust-scope]");
   if (trustButton) {
     const reason = window.prompt(t("administration.reasonPrompt"));
@@ -738,18 +1066,14 @@ document.querySelector("#administration").addEventListener("click", (event) => {
   }
   const revokeButton = event.target.closest("[data-revoke-key]");
   if (!revokeButton) return;
-  const reason = window.prompt(t("administration.revokeReasonPrompt"));
-  if (!reason?.trim()) return;
-  revokeButton.disabled = true;
-  void api.administration.revokeKey(revokeButton.dataset.revokeKey, reason.trim())
-    .then(loadAdministration)
-    .catch((error) => {
-      state.administration.error = error;
-      renderAdministration();
-    })
-    .finally(() => {
-      revokeButton.disabled = false;
-    });
+  void revokeAdministrationKey(revokeButton.dataset.revokeKey, revokeButton);
+});
+administrationDeviceDialog.querySelector(".dialog-close").addEventListener("click", () => administrationDeviceDialog.close());
+administrationDeviceDialog.addEventListener("click", (event) => {
+  const revokeButton = event.target.closest("[data-revoke-key]");
+  if (revokeButton) {
+    void revokeAdministrationKey(revokeButton.dataset.revokeKey, revokeButton);
+  }
 });
 dialog.querySelector("form").addEventListener("submit", submitDialog);
 dialog.addEventListener("close", () => {

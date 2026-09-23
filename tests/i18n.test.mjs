@@ -28,7 +28,7 @@ test("all translation keys referenced by the web UI exist", async () => {
     readFile(new URL("../app.js", import.meta.url), "utf8"),
   ]);
   const keyPattern =
-    /data-(?:i18n|i18n-aria-label|i18n-content|title-key|toast-key)="([^"]+)"/g;
+    /data-(?:i18n|i18n-aria-label|i18n-content|i18n-placeholder|title-key|toast-key)="([^"]+)"/g;
   const referencedKeys = [
     ...[...html.matchAll(keyPattern)].map((match) => match[1]),
     ...[...javascript.matchAll(/\bt\("([^"]+)"\)/g)].map((match) => match[1]),

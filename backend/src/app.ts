@@ -508,6 +508,25 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     payload: z.infer<typeof scopedTrustPatchInput>,
   ) {
     requireOrganizationAdminActor(request);
+    if (scopeType === "user" && blockingTrustStates.has(payload.state)) {
+      const user = await options.repository.getOrganizationUser(request.actor.tenantId, scopeId);
+      if (user?.status === "active" && isOrganizationAdmin(user.roles)) {
+        const users = await options.repository.listOrganizationUsers(request.actor.tenantId);
+        const otherActiveAdmins = users.filter(
+          (candidate) =>
+            candidate.actorId !== scopeId
+            && candidate.status === "active"
+            && isOrganizationAdmin(candidate.roles),
+        );
+        if (otherActiveAdmins.length === 0) {
+          throw new AppError(
+            "LAST_ADMIN_REQUIRED",
+            "The last active organization administrator cannot be blocked",
+            409,
+          );
+        }
+      }
+    }
     const trust = await options.repository.setTrustState(
       request.actor.tenantId,
       request.actor.actorId,
@@ -534,6 +553,70 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       ...user,
       trustState: (await options.repository.getTrustState(tenantId, "user", user.actorId))?.state ?? null,
     })));
+  }
+
+  async function saveOrganizationUser(request: FastifyRequest) {
+    requireOrganizationAdminActor(request);
+    const { actorId } = z.object({ actorId: uuid }).parse(request.params);
+    const payload = organizationUserInput.parse(request.body);
+    const existing = await options.repository.getOrganizationUser(request.actor.tenantId, actorId);
+    const roles = payload.roles ?? existing?.roles ?? [];
+    const status = payload.status ?? existing?.status ?? "active";
+    if (
+      existing?.status === "active"
+      && isOrganizationAdmin(existing.roles)
+      && (status !== "active" || !isOrganizationAdmin(roles))
+    ) {
+      const users = await options.repository.listOrganizationUsers(request.actor.tenantId);
+      const otherActiveAdmins = users.filter(
+        (candidate) =>
+          candidate.actorId !== actorId
+          && candidate.status === "active"
+          && isOrganizationAdmin(candidate.roles),
+      );
+      if (otherActiveAdmins.length === 0) {
+        throw new AppError(
+          "LAST_ADMIN_REQUIRED",
+          "The last active organization administrator cannot be suspended or demoted",
+          409,
+        );
+      }
+    }
+    const user = await options.repository.upsertOrganizationUser(request.actor.tenantId, {
+      actorId,
+      ...(payload.subjectId ? { subjectId: payload.subjectId } : {}),
+      ...(payload.displayName ? { displayName: payload.displayName } : {}),
+      ...(payload.email ? { email: payload.email } : {}),
+      roles,
+      status,
+    });
+    await options.repository.appendAudit(request.actor.tenantId, request.actor.actorId, "identity.user.upserted", {
+      actorId,
+      roles: user.roles,
+      status: user.status,
+    });
+    return data(user);
+  }
+
+  async function updateAdminDeviceStatus(request: FastifyRequest) {
+    requireOrganizationAdminActor(request);
+    const { deviceId } = z.object({ deviceId: uuid }).parse(request.params);
+    const payload = deviceStatusInput.parse(request.body);
+    const device = await options.repository.updateDeviceStatus(
+      request.actor.tenantId,
+      deviceId,
+      request.actor.actorId,
+      {
+        status: payload.status,
+        ...(payload.reason ? { reason: payload.reason } : {}),
+      },
+    );
+    await options.repository.appendAudit(request.actor.tenantId, request.actor.actorId, "identity.device.status_changed", {
+      deviceId,
+      status: payload.status,
+      reason: payload.reason ?? null,
+    });
+    return data(device);
   }
 
   async function listDevicesWithTrust(tenantId: string, actorId?: string) {
@@ -633,25 +716,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     requireOrganizationAdminActor(request);
     return data(await listUsersWithTrust(request.actor.tenantId));
   });
-  app.put("/api/v1/admin/identity/users/:actorId", { schema: { tags: ["identity"] } }, async (request) => {
-    requireOrganizationAdminActor(request);
-    const { actorId } = z.object({ actorId: uuid }).parse(request.params);
-    const payload = organizationUserInput.parse(request.body);
-    const user = await options.repository.upsertOrganizationUser(request.actor.tenantId, {
-      actorId,
-      ...(payload.subjectId ? { subjectId: payload.subjectId } : {}),
-      ...(payload.displayName ? { displayName: payload.displayName } : {}),
-      ...(payload.email ? { email: payload.email } : {}),
-      ...(payload.roles ? { roles: payload.roles } : {}),
-      ...(payload.status ? { status: payload.status } : {}),
-    });
-    await options.repository.appendAudit(request.actor.tenantId, request.actor.actorId, "identity.user.upserted", {
-      actorId,
-      roles: user.roles,
-      status: user.status,
-    });
-    return data(user);
-  });
+  app.put("/api/v1/admin/identity/users/:actorId", { schema: { tags: ["identity"] } }, saveOrganizationUser);
+  app.put("/api/v1/admin/users/:actorId", { schema: { tags: ["identity"] } }, saveOrganizationUser);
   app.patch("/api/v1/admin/users/:actorId/trust", { schema: { tags: ["identity"] } }, async (request) => {
     const { actorId } = z.object({ actorId: uuid }).parse(request.params);
     const payload = scopedTrustPatchInput.parse(request.body);
@@ -684,26 +750,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       records: await options.repository.listAttestations(request.actor.tenantId, deviceId),
     });
   });
-  app.post("/api/v1/admin/identity/devices/:deviceId/status", { schema: { tags: ["identity"] } }, async (request) => {
-    requireOrganizationAdminActor(request);
-    const { deviceId } = z.object({ deviceId: uuid }).parse(request.params);
-    const payload = deviceStatusInput.parse(request.body);
-    const device = await options.repository.updateDeviceStatus(
-      request.actor.tenantId,
-      deviceId,
-      request.actor.actorId,
-      {
-        status: payload.status,
-        ...(payload.reason ? { reason: payload.reason } : {}),
-      },
-    );
-    await options.repository.appendAudit(request.actor.tenantId, request.actor.actorId, "identity.device.status_changed", {
-      deviceId,
-      status: payload.status,
-      reason: payload.reason ?? null,
-    });
-    return data(device);
-  });
+  app.post("/api/v1/admin/identity/devices/:deviceId/status", { schema: { tags: ["identity"] } }, updateAdminDeviceStatus);
+  app.post("/api/v1/admin/devices/:deviceId/status", { schema: { tags: ["identity"] } }, updateAdminDeviceStatus);
   app.patch("/api/v1/admin/devices/:deviceId/trust", { schema: { tags: ["identity"] } }, async (request) => {
     const { deviceId } = z.object({ deviceId: uuid }).parse(request.params);
     const payload = scopedTrustPatchInput.parse(request.body);

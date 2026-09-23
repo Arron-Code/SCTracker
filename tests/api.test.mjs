@@ -80,8 +80,17 @@ test("resource and job requests use the documented endpoints and JSON shapes", a
   await client.dds.create({ shipmentId: "shipment-1", action: "validate" });
   await client.dds.get("dds/1");
   await client.administration.users();
+  await client.administration.saveUser("actor/1", {
+    displayName: "Operator",
+    email: "operator@example.test",
+    roles: ["operator"],
+    status: "active",
+  });
   await client.administration.devices();
+  await client.administration.deviceAttestations("device/1");
+  await client.administration.setDeviceStatus("device/1", { status: "suspended", reason: "review" });
   await client.administration.keys();
+  await client.administration.trustHistory("device", "device/1");
   await client.administration.setUserTrust("actor/1", { state: "SUSPENDED", reason: "review", details: {} });
   await client.administration.setDeviceTrust("device/1", { state: "LOCALLY_TRUSTED", reason: "approved", details: {} });
   await client.administration.revokeKey("key/1", "compromised");
@@ -102,8 +111,12 @@ test("resource and job requests use the documented endpoints and JSON shapes", a
       ["https://api.example.test/api/v1/dds/submissions", "POST"],
       ["https://api.example.test/api/v1/dds/submissions/dds%2F1", "GET"],
       ["https://api.example.test/api/v1/admin/users", "GET"],
+      ["https://api.example.test/api/v1/admin/users/actor%2F1", "PUT"],
       ["https://api.example.test/api/v1/admin/devices", "GET"],
+      ["https://api.example.test/api/v1/admin/devices/device%2F1/attestations", "GET"],
+      ["https://api.example.test/api/v1/admin/devices/device%2F1/status", "POST"],
       ["https://api.example.test/api/v1/admin/keys", "GET"],
+      ["https://api.example.test/api/v1/admin/identity/trust/history?scopeType=device&scopeId=device%2F1", "GET"],
       ["https://api.example.test/api/v1/admin/users/actor%2F1/trust", "PATCH"],
       ["https://api.example.test/api/v1/admin/devices/device%2F1/trust", "PATCH"],
       ["https://api.example.test/api/v1/admin/keys/key%2F1/revoke", "POST"],

@@ -9,7 +9,7 @@
       data-i18n-content="meta.description"
     />
     <title>SCTracker | Coffee Evidence</title>
-    <link rel="stylesheet" href="styles.css?v=5" />
+    <link rel="stylesheet" href="styles.css?v=6" />
   </head>
   <body>
     <div class="app-shell" id="app-shell" hidden>
@@ -342,7 +342,7 @@
         </section>
 
         <section class="view" id="administration" data-title-key="title.administration">
-          <div class="section-intro">
+          <div class="section-intro administration-intro">
             <div>
               <p class="eyebrow" data-i18n="administration.eyebrow">VERTRAUENSVERWALTUNG</p>
               <h2 data-i18n="administration.title">Benutzer, Geräte und Schlüssel</h2>
@@ -351,72 +351,137 @@
             <button class="secondary-button" id="administration-refresh" type="button" data-i18n="common.refresh">Aktualisieren</button>
           </div>
           <div class="resource-state error" id="administration-error" role="alert" hidden></div>
-          <article class="panel table-panel">
-            <div class="panel-header">
+          <div class="administration-summary" aria-label="Verwaltungsübersicht" data-i18n-aria-label="administration.summary">
+            <article class="administration-stat user-stat">
+              <span data-i18n="administration.totalUsers">Benutzer gesamt</span>
+              <strong id="administration-user-count">0</strong>
+              <small id="administration-active-user-count">0 aktiv</small>
+            </article>
+            <article class="administration-stat device-stat">
+              <span data-i18n="administration.totalDevices">Geräte gesamt</span>
+              <strong id="administration-device-count">0</strong>
+              <small id="administration-trusted-device-count">0 vertrauenswürdig</small>
+            </article>
+            <article class="administration-stat key-stat">
+              <span data-i18n="administration.activeKeys">Aktive Schlüssel</span>
+              <strong id="administration-key-count">0</strong>
+              <small id="administration-revoked-key-count">0 widerrufen</small>
+            </article>
+          </div>
+
+          <section class="administration-zone administration-users-zone" aria-labelledby="administration-users-title">
+            <div class="administration-zone-header">
               <div>
                 <p class="eyebrow" data-i18n="administration.usersEyebrow">ORGANISATION</p>
-                <h3 data-i18n="administration.users">Benutzer</h3>
+                <h3 id="administration-users-title" data-i18n="administration.userAdministration">Benutzeradministration</h3>
+                <p data-i18n="administration.userDescription">Identitäten, Rollen, Zugriffsstatus und organisatorisches Vertrauen zentral steuern.</p>
               </div>
+              <button class="primary-button administration-add-user" id="administration-add-user" type="button" data-i18n="administration.addUser">Benutzer hinzufügen</button>
             </div>
-            <div class="responsive-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th data-i18n="administration.identity">Identität</th>
-                    <th data-i18n="administration.roles">Rollen</th>
-                    <th data-i18n="administration.status">Status</th>
-                    <th data-i18n="administration.lastSeen">Letzte Anmeldung</th>
-                    <th data-i18n="administration.actions">Aktionen</th>
-                  </tr>
-                </thead>
-                <tbody id="administration-users"></tbody>
-              </table>
+            <div class="administration-toolbar">
+              <label class="administration-search">
+                <span data-i18n="administration.searchUsers">Benutzer suchen</span>
+                <input id="administration-user-search" type="search" data-i18n-placeholder="administration.searchUsersPlaceholder" placeholder="Name, E-Mail oder ID" />
+              </label>
+              <label>
+                <span data-i18n="administration.filterStatus">Status filtern</span>
+                <select id="administration-user-status-filter">
+                  <option value="" data-i18n="administration.allStatuses">Alle Status</option>
+                  <option value="active" data-i18n="administration.active">Aktiv</option>
+                  <option value="suspended" data-i18n="administration.suspended">Gesperrt</option>
+                </select>
+              </label>
             </div>
-          </article>
-          <article class="panel table-panel">
-            <div class="panel-header">
+            <article class="panel table-panel administration-table-card">
+              <div class="responsive-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th data-i18n="administration.identity">Identität</th>
+                      <th data-i18n="administration.roles">Rollen</th>
+                      <th data-i18n="administration.status">Status</th>
+                      <th data-i18n="administration.lastSeen">Letzte Anmeldung</th>
+                      <th data-i18n="administration.actions">Aktionen</th>
+                    </tr>
+                  </thead>
+                  <tbody id="administration-users"></tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+
+          <section class="administration-zone administration-devices-zone" aria-labelledby="administration-devices-title">
+            <div class="administration-zone-header">
               <div>
                 <p class="eyebrow" data-i18n="administration.devicesEyebrow">GERÄTEVERTRAUEN</p>
-                <h3 data-i18n="administration.devices">Geräte</h3>
+                <h3 id="administration-devices-title" data-i18n="administration.deviceAdministration">Geräteverwaltung</h3>
+                <p data-i18n="administration.deviceDescription">Registrierte Endgeräte, Attestierung, Freigabestatus und Schlüsselbestand überwachen.</p>
               </div>
             </div>
-            <div class="responsive-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th data-i18n="administration.device">Gerät</th>
-                    <th data-i18n="administration.platform">Plattform</th>
-                    <th data-i18n="administration.status">Status</th>
-                    <th data-i18n="administration.attestation">Attestierung</th>
-                    <th data-i18n="administration.actions">Aktionen</th>
-                  </tr>
-                </thead>
-                <tbody id="administration-devices"></tbody>
-              </table>
+            <div class="administration-toolbar">
+              <label class="administration-search">
+                <span data-i18n="administration.searchDevices">Geräte suchen</span>
+                <input id="administration-device-search" type="search" data-i18n-placeholder="administration.searchDevicesPlaceholder" placeholder="Name, Plattform, Besitzer oder ID" />
+              </label>
+              <label>
+                <span data-i18n="administration.filterStatus">Status filtern</span>
+                <select id="administration-device-status-filter">
+                  <option value="" data-i18n="administration.allStatuses">Alle Status</option>
+                  <option value="pending" data-i18n="administration.pending">Ausstehend</option>
+                  <option value="active" data-i18n="administration.active">Aktiv</option>
+                  <option value="suspended" data-i18n="administration.suspended">Gesperrt</option>
+                  <option value="revoked" data-i18n="administration.revoked">Widerrufen</option>
+                </select>
+              </label>
+              <label>
+                <span data-i18n="administration.filterPlatform">Plattform filtern</span>
+                <select id="administration-device-platform-filter">
+                  <option value="" data-i18n="administration.allPlatforms">Alle Plattformen</option>
+                  <option value="ios">iOS</option>
+                  <option value="android">Android</option>
+                </select>
+              </label>
             </div>
-          </article>
-          <article class="panel table-panel">
-            <div class="panel-header">
-              <div>
-                <p class="eyebrow" data-i18n="administration.keysEyebrow">SIGNATURVERTRAUEN</p>
-                <h3 data-i18n="administration.keys">Schlüssel</h3>
+            <article class="panel table-panel administration-table-card">
+              <div class="responsive-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th data-i18n="administration.device">Gerät</th>
+                      <th data-i18n="administration.owner">Besitzer</th>
+                      <th data-i18n="administration.platform">Plattform</th>
+                      <th data-i18n="administration.status">Status</th>
+                      <th data-i18n="administration.attestation">Attestierung</th>
+                      <th data-i18n="administration.actions">Aktionen</th>
+                    </tr>
+                  </thead>
+                  <tbody id="administration-devices"></tbody>
+                </table>
               </div>
-            </div>
-            <div class="responsive-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th data-i18n="administration.key">Schlüssel</th>
-                    <th data-i18n="administration.device">Gerät</th>
-                    <th data-i18n="administration.algorithm">Algorithmus</th>
-                    <th data-i18n="administration.status">Status</th>
-                    <th data-i18n="administration.actions">Aktionen</th>
-                  </tr>
-                </thead>
-                <tbody id="administration-keys"></tbody>
-              </table>
-            </div>
-          </article>
+            </article>
+            <article class="panel table-panel administration-keys-card">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow" data-i18n="administration.keysEyebrow">SIGNATURVERTRAUEN</p>
+                  <h3 data-i18n="administration.keys">Schlüssel</h3>
+                </div>
+              </div>
+              <div class="responsive-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th data-i18n="administration.key">Schlüssel</th>
+                      <th data-i18n="administration.device">Gerät</th>
+                      <th data-i18n="administration.algorithm">Algorithmus</th>
+                      <th data-i18n="administration.status">Status</th>
+                      <th data-i18n="administration.actions">Aktionen</th>
+                    </tr>
+                  </thead>
+                  <tbody id="administration-keys"></tbody>
+                </table>
+              </div>
+            </article>
+          </section>
         </section>
 
         <section class="view" id="guide" data-title-key="title.guide">
@@ -510,6 +575,18 @@
         </div>
       </form>
     </dialog>
+    <dialog class="workflow-dialog administration-device-dialog" id="administration-device-dialog" aria-labelledby="administration-device-dialog-title">
+      <div class="dialog-shell">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow" data-i18n="administration.deviceDetailsEyebrow">GERÄTEAKTE</p>
+            <h2 id="administration-device-dialog-title" data-i18n="administration.deviceDetails">Gerätedetails</h2>
+          </div>
+          <button class="dialog-close" type="button" aria-label="Schließen" data-i18n-aria-label="common.close">×</button>
+        </div>
+        <div id="administration-device-dialog-content"></div>
+      </div>
+    </dialog>
     <dialog class="workflow-dialog" id="auth-dialog" aria-labelledby="auth-dialog-title">
       <div class="dialog-shell">
         <div class="panel-header">
@@ -598,6 +675,6 @@
         SC_TRACKER_AUTH_PROVIDERS: ["google"],
       };
     </script>
-    <script type="module" src="app.js?v=5"></script>
+    <script type="module" src="app.js?v=6"></script>
   </body>
 </html>
