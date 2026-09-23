@@ -173,6 +173,16 @@ function objectRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+export function organizationIdFromClaims(payload: Record<string, unknown>): string | null {
+  if (typeof payload.activeOrganizationId === "string" && payload.activeOrganizationId) {
+    return payload.activeOrganizationId;
+  }
+  const organization = objectRecord(payload.o);
+  return typeof organization?.id === "string" && organization.id
+    ? organization.id
+    : null;
+}
+
 export function rolesFromClaims(payload: Record<string, unknown>, activeOrganizationId: string): string[] {
   const roles = new Set<string>();
   collectStringRoles(payload.role, roles);
@@ -190,6 +200,12 @@ export function rolesFromClaims(payload: Record<string, unknown>, activeOrganiza
   if (userMetadata) {
     collectStringRoles(userMetadata.role, roles);
     collectStringRoles(userMetadata.roles, roles);
+  }
+
+  const organization = objectRecord(payload.o);
+  if (organization?.id === activeOrganizationId) {
+    collectStringRoles(organization.role, roles);
+    collectStringRoles(organization.roles, roles);
   }
 
   for (const key of ["orgRoles", "organizationRoleMap", "organizationRolesMap"] as const) {

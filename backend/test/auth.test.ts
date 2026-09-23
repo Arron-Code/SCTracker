@@ -181,6 +181,32 @@ describe("Neon Managed Better Auth", () => {
     await app.close();
   }, 120_000);
 
+  it("accepts Neon's compact organization claims and organization admin role", async () => {
+    const app = await buildApp({
+      config: baseConfig,
+      repository: new MemoryRepository(),
+      providers,
+      authVerifier: async () => ({
+        sub: "user-production",
+        o: {
+          id: "org-production",
+          slug: "production",
+          role: "admin",
+        },
+        role: "authenticated",
+        exp: Math.floor(Date.now() / 1000) + 300,
+      }),
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/v1/admin/users",
+      headers: { authorization: ["Bearer", "valid"].join(" ") },
+    });
+    expect(response.statusCode).toBe(200);
+    await app.close();
+  }, 120_000);
+
   it("keeps development header auth but reports missing production configuration", async () => {
     const developmentApp = await buildApp({
       config: { ...baseConfig, NODE_ENV: "test", DEV_AUTH_ENABLED: true },

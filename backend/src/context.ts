@@ -3,7 +3,7 @@ import fp from "fastify-plugin";
 import { authIdentityUuid, createNeonJwtVerifier, type JwtVerifier } from "./auth.js";
 import { AppError } from "./errors.js";
 import type { Config } from "./config.js";
-import { normalizeRoles, rolesFromClaims } from "./identity.js";
+import { normalizeRoles, organizationIdFromClaims, rolesFromClaims } from "./identity.js";
 
 export interface ActorContext {
   tenantId: string;
@@ -82,14 +82,13 @@ export const actorContext = fp(async (app: FastifyInstance, options: ActorContex
       throw unauthenticated();
     }
 
-    const organizationId = payload.activeOrganizationId;
-    const roles = rolesFromClaims(payload as Record<string, unknown>, organizationId as string);
+    const organizationId = organizationIdFromClaims(payload as Record<string, unknown>);
+    const roles = rolesFromClaims(payload as Record<string, unknown>, organizationId ?? "");
     if (
       typeof payload.sub !== "string" ||
       payload.sub.length === 0 ||
       typeof payload.exp !== "number" ||
-      typeof organizationId !== "string" ||
-      organizationId.length === 0
+      !organizationId
     ) {
       throw unauthenticated();
     }
