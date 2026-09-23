@@ -1,5 +1,5 @@
 import { createApiClient, ApiError } from "./src/api.mjs?v=3";
-import { createManagedAuth, AuthError } from "./src/auth.mjs?v=2";
+import { createManagedAuth, AuthError } from "./src/auth.mjs?v=3";
 import { calculateCompletion, validateMassBalance } from "./src/domain.mjs?v=1";
 import { parseGeoJson } from "./src/geojson.mjs?v=2";
 import {

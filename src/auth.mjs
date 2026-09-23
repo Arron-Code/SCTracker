@@ -45,6 +45,7 @@ export function createManagedAuth(options = {}) {
   const runtime = options.config ?? globalThis.SC_TRACKER_CONFIG ?? {};
   const baseUrl = getAuthBaseUrl(runtime);
   const providers = getAuthProviders(runtime);
+  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const client = baseUrl
     ? (options.createClient ?? createAuthClient)(baseUrl)
     : null;
@@ -63,10 +64,20 @@ export function createManagedAuth(options = {}) {
     baseUrl,
     configured: client !== null,
     providers,
-    getSession: async () => unwrap(
-      await requireClient().getSession(),
-      "Could not load the session.",
-    ),
+    getSession: async () => {
+      requireClient();
+      if (!fetchImpl) {
+        throw new AuthError("AUTH_ERROR", "Fetch is not available.");
+      }
+      const response = await fetchImpl(`${baseUrl}/get-session`, {
+        credentials: "include",
+        headers: { accept: "application/json" },
+      });
+      if (!response.ok) {
+        throw new AuthError("AUTH_ERROR", `Could not load the session (${response.status}).`);
+      }
+      return response.json();
+    },
     token: () => tokenFromClient(requireClient()),
     signIn: async (email, password) => unwrap(
       await requireClient().signIn.email({ email, password }),

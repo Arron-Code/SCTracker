@@ -45,6 +45,19 @@ test("configured providers are normalized and unsupported providers are rejected
   );
 });
 
+test("signed-out session responses resolve to null", async () => {
+  const auth = createManagedAuth({
+    config: { SC_TRACKER_NEON_AUTH_URL: "https://auth.example.test/auth" },
+    createClient: () => ({}),
+    fetchImpl: async () => new Response("null", {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }),
+  });
+
+  assert.equal(await auth.getSession(), null);
+});
+
 test("password reset and social sign-in delegate to Neon Auth", async () => {
   const calls = [];
   const auth = createManagedAuth({
