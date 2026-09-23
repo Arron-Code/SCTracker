@@ -37,6 +37,17 @@ function unwrap(result, fallbackMessage) {
   return result?.data ?? null;
 }
 
+async function fetchAuthJson(fetchImpl, url, fallbackMessage) {
+  const response = await fetchImpl(url, {
+    credentials: "include",
+    headers: { accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new AuthError("AUTH_ERROR", `${fallbackMessage} (${response.status}).`);
+  }
+  return response.json();
+}
+
 export function tokenFromClient(client) {
   return client.token().then((result) => unwrap(result, "Could not obtain an access token.")?.token ?? null);
 }
@@ -69,16 +80,16 @@ export function createManagedAuth(options = {}) {
       if (!fetchImpl) {
         throw new AuthError("AUTH_ERROR", "Fetch is not available.");
       }
-      const response = await fetchImpl(`${baseUrl}/get-session`, {
-        credentials: "include",
-        headers: { accept: "application/json" },
-      });
-      if (!response.ok) {
-        throw new AuthError("AUTH_ERROR", `Could not load the session (${response.status}).`);
-      }
-      return response.json();
+      return fetchAuthJson(fetchImpl, `${baseUrl}/get-session`, "Could not load the session");
     },
-    token: () => tokenFromClient(requireClient()),
+    token: async () => {
+      requireClient();
+      if (!fetchImpl) {
+        throw new AuthError("AUTH_ERROR", "Fetch is not available.");
+      }
+      const result = await fetchAuthJson(fetchImpl, `${baseUrl}/token`, "Could not obtain an access token");
+      return typeof result?.token === "string" && result.token ? result.token : null;
+    },
     signIn: async (email, password) => unwrap(
       await requireClient().signIn.email({ email, password }),
       "Sign-in failed.",

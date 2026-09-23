@@ -58,6 +58,25 @@ test("signed-out session responses resolve to null", async () => {
   assert.equal(await auth.getSession(), null);
 });
 
+test("managed auth obtains a fresh access token directly from Neon Auth", async () => {
+  const calls = [];
+  const auth = createManagedAuth({
+    config: { SC_TRACKER_NEON_AUTH_URL: "https://auth.example.test/auth" },
+    createClient: () => ({}),
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      return new Response(JSON.stringify({ token: "fresh-jwt" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  });
+
+  assert.equal(await auth.token(), "fresh-jwt");
+  assert.equal(calls[0].url, "https://auth.example.test/auth/token");
+  assert.equal(calls[0].init.credentials, "include");
+});
+
 test("password reset and social sign-in delegate to Neon Auth", async () => {
   const calls = [];
   const auth = createManagedAuth({

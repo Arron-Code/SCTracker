@@ -1,5 +1,5 @@
 import { createApiClient, ApiError } from "./src/api.mjs?v=3";
-import { createManagedAuth, AuthError } from "./src/auth.mjs?v=3";
+import { createManagedAuth, AuthError } from "./src/auth.mjs?v=4";
 import { calculateCompletion, validateMassBalance } from "./src/domain.mjs?v=1";
 import { parseGeoJson } from "./src/geojson.mjs?v=2";
 import {
@@ -1106,6 +1106,9 @@ administrationDeviceDialog.addEventListener("click", (event) => {
   }
 });
 dialog.querySelector("form").addEventListener("submit", submitDialog);
+dialog.querySelectorAll("[value='cancel']").forEach((button) => {
+  button.addEventListener("click", () => dialog.close());
+});
 dialog.addEventListener("close", () => {
   dialog.querySelector("form").reset();
   activeDialog = null;

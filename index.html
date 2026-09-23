@@ -565,12 +565,12 @@
       <form method="dialog" class="dialog-shell">
         <div class="panel-header">
           <h2 id="dialog-title"></h2>
-          <button class="dialog-close" value="cancel" aria-label="Schließen" data-i18n-aria-label="common.close">×</button>
+          <button class="dialog-close" type="button" value="cancel" aria-label="Schließen" data-i18n-aria-label="common.close">×</button>
         </div>
         <div id="dialog-content"></div>
         <div class="form-error" id="dialog-error" role="alert"></div>
         <div class="dialog-actions">
-          <button class="secondary-button" value="cancel" data-i18n="common.cancel">Abbrechen</button>
+          <button class="secondary-button" type="button" value="cancel" data-i18n="common.cancel">Abbrechen</button>
           <button class="primary-button" id="dialog-submit" value="default" data-i18n="common.save">Speichern</button>
         </div>
       </form>
@@ -675,6 +675,6 @@
         SC_TRACKER_AUTH_PROVIDERS: ["google"],
       };
     </script>
-    <script type="module" src="app.js?v=8"></script>
+    <script type="module" src="app.js?v=9"></script>
   </body>
 </html>
