@@ -58,6 +58,30 @@ test("signed-out session responses resolve to null", async () => {
   assert.equal(await auth.getSession(), null);
 });
 
+test("OAuth session verifiers are exchanged through the Neon Auth client", async () => {
+  let clientCalls = 0;
+  let fetchCalls = 0;
+  const session = { session: { id: "session-1" }, user: { id: "user-1" } };
+  const auth = createManagedAuth({
+    config: { SC_TRACKER_NEON_AUTH_URL: "https://auth.example.test/auth" },
+    location: { search: "?neon_auth_session_verifier=one-time-verifier" },
+    createClient: () => ({
+      getSession: async () => {
+        clientCalls += 1;
+        return { data: session, error: null };
+      },
+    }),
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      return new Response("null");
+    },
+  });
+
+  assert.deepEqual(await auth.getSession(), session);
+  assert.equal(clientCalls, 1);
+  assert.equal(fetchCalls, 0);
+});
+
 test("managed auth obtains a fresh access token directly from Neon Auth", async () => {
   const calls = [];
   const auth = createManagedAuth({

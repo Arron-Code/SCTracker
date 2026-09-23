@@ -12,6 +12,8 @@ function trimTrailingSlash(value) {
   return value.replace(/\/+$/, "");
 }
 
+const SESSION_VERIFIER_PARAM = "neon_auth_session_verifier";
+
 export function getAuthBaseUrl(runtime = globalThis.SC_TRACKER_CONFIG ?? {}) {
   const value = runtime.SC_TRACKER_NEON_AUTH_URL ?? runtime.neonAuthUrl;
   return typeof value === "string" && value.trim()
@@ -58,6 +60,7 @@ export function createManagedAuth(options = {}) {
   const baseUrl = getAuthBaseUrl(runtime);
   const providers = getAuthProviders(runtime);
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const location = options.location ?? globalThis.location;
   const client = baseUrl
     ? (options.createClient ?? createAuthClient)(baseUrl)
     : null;
@@ -77,7 +80,13 @@ export function createManagedAuth(options = {}) {
     configured: client !== null,
     providers,
     getSession: async () => {
-      requireClient();
+      const authClient = requireClient();
+      if (new URLSearchParams(location?.search ?? "").has(SESSION_VERIFIER_PARAM)) {
+        return unwrap(
+          await authClient.getSession(),
+          "Could not complete the authentication callback.",
+        );
+      }
       if (!fetchImpl) {
         throw new AuthError("AUTH_ERROR", "Fetch is not available.");
       }
