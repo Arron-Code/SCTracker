@@ -6,7 +6,7 @@ import {
   SUPPORTED_LANGUAGES,
   applyTranslations,
   translate,
-} from "./src/i18n.mjs?v=4";
+} from "./src/i18n.mjs?v=5";
 
 const auth = createManagedAuth();
 const api = createApiClient({
@@ -160,6 +160,17 @@ function errorMessage(error) {
   }
   if (error instanceof ApiError && error.code === "AUTH_REQUIRED") {
     return t("auth.organizationRequired");
+  }
+  if (error instanceof ApiError && error.code === "VALIDATION_ERROR" && Array.isArray(error.details)) {
+    const details = error.details
+      .map((issue) => {
+        const path = Array.isArray(issue?.path) && issue.path.length
+          ? issue.path.join(".")
+          : t("error.request");
+        return `${path}: ${issue?.message ?? t("error.validation")}`;
+      })
+      .join("; ");
+    return `${t("error.validation")} ${details}`;
   }
   if (error instanceof ApiError && ["HTTP_ERROR", "INVALID_RESPONSE"].includes(error.code)) {
     return t("error.generic");
@@ -848,7 +859,7 @@ const dialogDefinitions = {
       return `
         <label>
           <span>${escapeHtml(t("administration.actorId"))}</span>
-          <input name="actorId" required pattern="[0-9a-fA-F-]{36}" value="${escapeHtml(user?.actorId ?? "")}" ${user ? "readonly" : ""}>
+          <input name="actorId" required pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}" placeholder="12345678-1234-4123-8123-123456789abc" value="${escapeHtml(user?.actorId ?? "")}" ${user ? "readonly" : ""}>
           <small>${escapeHtml(t("administration.actorIdHelp"))}</small>
         </label>
         <label>
