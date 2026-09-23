@@ -12,6 +12,7 @@ import {
 
 const baseURL = getNeonAuthUrl(process.env.EXPO_PUBLIC_NEON_AUTH_URL);
 const AUTH_REQUEST_TIMEOUT_MS = 15_000;
+const MOBILE_AUTH_CALLBACK_URL = "https://sc-tracker-meloy.vercel.app/";
 const client = baseURL
   ? createAuthClient({
       baseURL,
@@ -83,7 +84,12 @@ export async function getSession(): Promise<AuthSession | null> {
 export async function signIn(email: string, password: string) {
   return unwrap(
     await authRequest(
-      requireClient().signIn.email({ email, password }),
+      requireClient().signIn.email({
+        email,
+        password,
+        // Native requests have no browser Origin, so Neon requires an absolute callback URL.
+        callbackURL: MOBILE_AUTH_CALLBACK_URL,
+      }),
       "Sign-in timed out. Check your connection and try again.",
     ),
     "Sign-in failed.",
