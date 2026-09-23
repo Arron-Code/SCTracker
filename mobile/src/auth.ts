@@ -11,6 +11,7 @@ import {
 } from "./auth-core";
 
 const baseURL = getNeonAuthUrl(process.env.EXPO_PUBLIC_NEON_AUTH_URL);
+const AUTH_REQUEST_TIMEOUT_MS = 15_000;
 const client = baseURL
   ? createAuthClient({
       baseURL,
@@ -48,63 +49,107 @@ function unwrap<T>(
 
 export const authConfigured = client !== null;
 
+async function authRequest<T>(request: Promise<T>, timeoutMessage: string): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      request,
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new AuthError("AUTH_TIMEOUT", timeoutMessage)),
+          AUTH_REQUEST_TIMEOUT_MS,
+        );
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
 export async function getAccessToken(): Promise<string | null> {
   return tokenFromClient(requireClient());
 }
 
 export async function getSession(): Promise<AuthSession | null> {
   return unwrap(
-    await requireClient().getSession(),
+    await authRequest(
+      requireClient().getSession(),
+      "The session request timed out. Please try again.",
+    ),
     "Could not load the session.",
   ) as AuthSession | null;
 }
 
 export async function signIn(email: string, password: string) {
   return unwrap(
-    await requireClient().signIn.email({ email, password }),
+    await authRequest(
+      requireClient().signIn.email({ email, password }),
+      "Sign-in timed out. Check your connection and try again.",
+    ),
     "Sign-in failed.",
   );
 }
 
 export async function requestPasswordReset(email: string, redirectTo: string) {
   return unwrap(
-    await requireClient().requestPasswordReset({ email, redirectTo }),
+    await authRequest(
+      requireClient().requestPasswordReset({ email, redirectTo }),
+      "The password reset request timed out. Please try again.",
+    ),
     "Could not send the password reset email.",
   );
 }
 
 export async function resetPassword(newPassword: string, token: string) {
   return unwrap(
-    await requireClient().resetPassword({ newPassword, token }),
+    await authRequest(
+      requireClient().resetPassword({ newPassword, token }),
+      "The password reset request timed out. Please try again.",
+    ),
     "Could not reset the password.",
   );
 }
 
 export async function signOut() {
-  return unwrap(await requireClient().signOut(), "Sign-out failed.");
+  return unwrap(
+    await authRequest(
+      requireClient().signOut(),
+      "Sign-out timed out. Please try again.",
+    ),
+    "Sign-out failed.",
+  );
 }
 
 export async function listOrganizations(): Promise<AuthOrganization[]> {
   return (unwrap(
-    await requireClient().organization.list(),
+    await authRequest(
+      requireClient().organization.list(),
+      "Loading organizations timed out. Please try again.",
+    ),
     "Could not load organizations.",
   ) ?? []) as AuthOrganization[];
 }
 
 export async function createOrganization(name: string, slug: string) {
   return unwrap(
-    await requireClient().organization.create({
-      name,
-      slug,
-      keepCurrentActiveOrganization: false,
-    }),
+    await authRequest(
+      requireClient().organization.create({
+        name,
+        slug,
+        keepCurrentActiveOrganization: false,
+      }),
+      "Creating the organization timed out. Please try again.",
+    ),
     "Could not create the organization.",
   );
 }
 
 export async function setActiveOrganization(organizationId: string) {
   return unwrap(
-    await requireClient().organization.setActive({ organizationId }),
+    await authRequest(
+      requireClient().organization.setActive({ organizationId }),
+      "Selecting the organization timed out. Please try again.",
+    ),
     "Could not select the organization.",
   );
 }

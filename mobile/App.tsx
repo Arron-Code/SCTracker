@@ -114,27 +114,31 @@ function Button({
   onPress,
   secondary = false,
   disabled = false,
+  loading = false,
 }: {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
   secondary?: boolean;
   disabled?: boolean;
+  loading?: boolean;
 }) {
   return (
     <Pressable
       onPress={onPress}
-      disabled={disabled}
+      disabled={disabled || loading}
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ busy: loading, disabled: disabled || loading }}
       style={[
         styles.button,
         secondary && styles.buttonSecondary,
-        disabled && styles.buttonDisabled,
+        (disabled || loading) && styles.buttonDisabled,
       ]}
     >
-      <Ionicons name={icon} size={18} color={secondary ? palette.forest : "#FFFFFF"} />
+      {loading
+        ? <ActivityIndicator size="small" color={secondary ? palette.forest : "#FFFFFF"} />
+        : <Ionicons name={icon} size={18} color={secondary ? palette.forest : "#FFFFFF"} />}
       <Text style={[styles.buttonText, secondary && styles.buttonTextSecondary]}>{label}</Text>
     </Pressable>
   );
@@ -148,14 +152,18 @@ function Field({
   placeholder,
   keyboardType,
   secureTextEntry = false,
+  autoCapitalize = "sentences",
+  autoCorrect = true,
 }: {
   label: string;
   value: string;
   onChangeText: (value: string) => void;
   multiline?: boolean;
   placeholder?: string;
-  keyboardType?: "default" | "decimal-pad" | "number-pad";
+  keyboardType?: "default" | "decimal-pad" | "email-address" | "number-pad";
   secureTextEntry?: boolean;
+  autoCapitalize?: "none" | "sentences" | "words" | "characters";
+  autoCorrect?: boolean;
 }) {
   return (
     <View>
@@ -168,7 +176,8 @@ function Field({
         multiline={multiline}
         keyboardType={keyboardType}
         secureTextEntry={secureTextEntry}
-        autoCapitalize="sentences"
+        autoCapitalize={autoCapitalize}
+        autoCorrect={autoCorrect}
         style={[styles.input, multiline && styles.textArea]}
         accessibilityLabel={label}
       />
@@ -966,6 +975,7 @@ function AuthCard({
   const [organizationName, setOrganizationName] = useState("");
   const [organizationSlug, setOrganizationSlug] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -1049,14 +1059,36 @@ function AuthCard({
       <View style={styles.card}>
         <Text style={styles.cardTitle}>{t.auth.signIn}</Text>
         <Text style={styles.description}>{t.auth.accountProvided}</Text>
-        <Field label={t.auth.email} value={email} onChangeText={setEmail} />
-        <Field label={t.auth.password} value={password} onChangeText={setPassword} secureTextEntry />
+        <Field
+          label={t.auth.email}
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <Field
+          label={t.auth.password}
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
         {actionError ?? error ? <Text style={styles.errorText}>{actionError ?? error}</Text> : null}
         <Button
           label={t.auth.signIn}
           icon="log-in"
-          disabled={submitting}
-          onPress={() => void run(() => signIn(email.trim(), password))}
+          disabled={submitting || !email.trim() || !password}
+          loading={signingIn}
+          onPress={() => void (async () => {
+            setSigningIn(true);
+            try {
+              await run(() => signIn(email.trim(), password));
+            } finally {
+              setSigningIn(false);
+            }
+          })()}
         />
         <Button
           label={t.auth.forgotPassword}
@@ -1423,7 +1455,7 @@ export default function App() {
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={[styles.authPage, wideLayout && styles.authPageWide]}
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="always"
         >
           <View style={styles.authContainer}>
             <View style={styles.authIntro}>

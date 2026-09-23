@@ -1,6 +1,6 @@
 export class AuthError extends Error {
   constructor(
-    readonly code: "AUTH_NOT_CONFIGURED" | "AUTH_REQUIRED" | "AUTH_ERROR",
+    readonly code: "AUTH_NOT_CONFIGURED" | "AUTH_REQUIRED" | "AUTH_ERROR" | "AUTH_TIMEOUT",
     message: string,
   ) {
     super(message);
