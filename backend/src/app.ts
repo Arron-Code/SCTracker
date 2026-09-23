@@ -1,6 +1,6 @@
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import cors from "@fastify/cors";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
@@ -599,6 +599,26 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return data(user);
   }
 
+  async function createOrganizationUser(request: FastifyRequest) {
+    requireOrganizationAdminActor(request);
+    const payload = organizationUserInput.parse(request.body);
+    const actorId = randomUUID();
+    const user = await options.repository.upsertOrganizationUser(request.actor.tenantId, {
+      actorId,
+      ...(payload.subjectId ? { subjectId: payload.subjectId } : {}),
+      ...(payload.displayName ? { displayName: payload.displayName } : {}),
+      ...(payload.email ? { email: payload.email } : {}),
+      roles: payload.roles ?? [],
+      status: payload.status ?? "active",
+    });
+    await options.repository.appendAudit(request.actor.tenantId, request.actor.actorId, "identity.user.created", {
+      actorId,
+      roles: user.roles,
+      status: user.status,
+    });
+    return data(user);
+  }
+
   async function updateAdminDeviceStatus(request: FastifyRequest) {
     requireOrganizationAdminActor(request);
     const { deviceId } = z.object({ deviceId: uuid }).parse(request.params);
@@ -717,6 +737,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     requireOrganizationAdminActor(request);
     return data(await listUsersWithTrust(request.actor.tenantId));
   });
+  app.post("/api/v1/admin/users", { schema: { tags: ["identity"] } }, createOrganizationUser);
   app.put("/api/v1/admin/identity/users/:actorId", { schema: { tags: ["identity"] } }, saveOrganizationUser);
   app.put("/api/v1/admin/users/:actorId", { schema: { tags: ["identity"] } }, saveOrganizationUser);
   app.patch("/api/v1/admin/users/:actorId/trust", { schema: { tags: ["identity"] } }, async (request) => {

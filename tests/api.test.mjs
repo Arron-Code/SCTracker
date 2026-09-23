@@ -102,6 +102,12 @@ test("resource and job requests use the documented endpoints and JSON shapes", a
   await client.dds.create({ shipmentId: "shipment-1", action: "validate" });
   await client.dds.get("dds/1");
   await client.administration.users();
+  await client.administration.createUser({
+    displayName: "Viewer",
+    email: "viewer@example.test",
+    roles: ["viewer"],
+    status: "active",
+  });
   await client.administration.saveUser("actor/1", {
     displayName: "Operator",
     email: "operator@example.test",
@@ -133,6 +139,7 @@ test("resource and job requests use the documented endpoints and JSON shapes", a
       ["https://api.example.test/api/v1/dds/submissions", "POST"],
       ["https://api.example.test/api/v1/dds/submissions/dds%2F1", "GET"],
       ["https://api.example.test/api/v1/admin/users", "GET"],
+      ["https://api.example.test/api/v1/admin/users", "POST"],
       ["https://api.example.test/api/v1/admin/identity/users/actor%2F1", "PUT"],
       ["https://api.example.test/api/v1/admin/devices", "GET"],
       ["https://api.example.test/api/v1/admin/devices/device%2F1/attestations", "GET"],

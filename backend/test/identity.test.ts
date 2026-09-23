@@ -260,6 +260,33 @@ describe("identity and trust backend", () => {
     await app.close();
   });
 
+  it("assigns internal UUIDs when administrators create users", async () => {
+    const app = await buildApp({ config, repository, providers });
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/admin/users",
+      headers: adminHeaders,
+      payload: {
+        displayName: "Generated User",
+        email: "generated@example.test",
+        roles: ["viewer"],
+        status: "active",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().data).toMatchObject({
+      displayName: "Generated User",
+      email: "generated@example.test",
+      roles: ["viewer"],
+      status: "active",
+    });
+    expect(response.json().data.actorId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    await app.close();
+  });
+
   it("protects the last active organization administrator from lockout", async () => {
     await repository.upsertOrganizationUser(tenantId, {
       actorId,

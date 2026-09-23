@@ -1,4 +1,4 @@
-import { createApiClient, ApiError } from "./src/api.mjs?v=4";
+import { createApiClient, ApiError } from "./src/api.mjs?v=5";
 import { createManagedAuth, AuthError } from "./src/auth.mjs?v=6";
 import { calculateCompletion, validateMassBalance } from "./src/domain.mjs?v=1";
 import { parseGeoJson } from "./src/geojson.mjs?v=2";
@@ -6,7 +6,7 @@ import {
   SUPPORTED_LANGUAGES,
   applyTranslations,
   translate,
-} from "./src/i18n.mjs?v=5";
+} from "./src/i18n.mjs?v=6";
 
 const auth = createManagedAuth();
 const api = createApiClient({
@@ -857,11 +857,11 @@ const dialogDefinitions = {
         ["viewer", "administration.roleViewer"],
       ];
       return `
-        <label>
-          <span>${escapeHtml(t("administration.actorId"))}</span>
-          <input name="actorId" required pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}" placeholder="12345678-1234-4123-8123-123456789abc" value="${escapeHtml(user?.actorId ?? "")}" ${user ? "readonly" : ""}>
-          <small>${escapeHtml(t("administration.actorIdHelp"))}</small>
-        </label>
+        ${user ? `
+          <label>
+            <span>${escapeHtml(t("administration.actorId"))}</span>
+            <input name="actorId" value="${escapeHtml(user.actorId)}" readonly>
+          </label>` : `<p class="form-hint">${escapeHtml(t("administration.actorIdGenerated"))}</p>`}
         <label>
           <span>${escapeHtml(t("form.name"))}</span>
           <input name="displayName" required maxlength="200" value="${escapeHtml(user?.displayName ?? "")}">
@@ -888,12 +888,11 @@ const dialogDefinitions = {
           </select>
         </label>`;
     },
-    execute: (form) => {
+    execute: (form, actorId) => {
       const roles = form.getAll("roles");
       if (roles.length === 0) {
         throw new ApiError("VALIDATION_ERROR", t("administration.roleRequired"), undefined, 400);
       }
-      const actorId = form.get("actorId").trim();
       const existing = state.administration.users.find((user) => user.actorId === actorId);
       const removesLastAdmin = existing?.status === "active"
         && existing.roles?.includes("organization_admin")
@@ -908,12 +907,15 @@ const dialogDefinitions = {
       if (removesLastAdmin) {
         throw new ApiError("LAST_ADMIN_REQUIRED", t("administration.lastAdminRequired"), undefined, 409);
       }
-      return api.administration.saveUser(actorId, {
+      const input = {
         displayName: form.get("displayName").trim(),
         email: form.get("email").trim(),
         roles,
         status: form.get("status"),
-      });
+      };
+      return existing
+        ? api.administration.saveUser(existing.actorId, input)
+        : api.administration.createUser(input);
     },
     success: "success.adminUser",
     refresh: loadAdministration,

@@ -14,12 +14,9 @@ test("workflow dialog cancel controls bypass validation and close the dialog", a
   assert.match(javascript, /querySelectorAll\("\[value='cancel'\]"\)[\s\S]*?dialog\.close\(\)/);
 });
 
-test("user creation requires a canonical UUID before submitting", async () => {
+test("user creation delegates ID generation to the backend", async () => {
   const javascript = await readFile(new URL("../app.js", import.meta.url), "utf8");
-  const pattern = javascript.match(/name="actorId" required pattern="([^"]+)"/)?.[1];
 
-  assert.ok(pattern);
-  const uuid = new RegExp(`^(?:${pattern})$`);
-  assert.equal(uuid.test("10001"), false);
-  assert.equal(uuid.test("12345678-1234-4123-8123-123456789abc"), true);
+  assert.match(javascript, /api\.administration\.createUser\(input\)/);
+  assert.doesNotMatch(javascript, /name="actorId" required/);
 });
