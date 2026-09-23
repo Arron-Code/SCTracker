@@ -511,14 +511,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     if (scopeType === "user" && blockingTrustStates.has(payload.state)) {
       const user = await options.repository.getOrganizationUser(request.actor.tenantId, scopeId);
       if (user?.status === "active" && isOrganizationAdmin(user.roles)) {
-        const users = await options.repository.listOrganizationUsers(request.actor.tenantId);
-        const otherActiveAdmins = users.filter(
-          (candidate) =>
-            candidate.actorId !== scopeId
-            && candidate.status === "active"
-            && isOrganizationAdmin(candidate.roles),
-        );
-        if (otherActiveAdmins.length === 0) {
+        if (!await hasOtherUsableOrganizationAdmin(request.actor.tenantId, scopeId)) {
           throw new AppError(
             "LAST_ADMIN_REQUIRED",
             "The last active organization administrator cannot be blocked",
@@ -555,6 +548,20 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     })));
   }
 
+  async function hasOtherUsableOrganizationAdmin(tenantId: string, excludedActorId: string) {
+    const users = await options.repository.listOrganizationUsers(tenantId);
+    const candidates = users.filter(
+      (candidate) =>
+        candidate.actorId !== excludedActorId
+        && candidate.status === "active"
+        && isOrganizationAdmin(candidate.roles),
+    );
+    const trustStatesForCandidates = await Promise.all(
+      candidates.map((candidate) => options.repository.getTrustState(tenantId, "user", candidate.actorId)),
+    );
+    return trustStatesForCandidates.some((trust) => !trust || !blockingTrustStates.has(trust.state));
+  }
+
   async function saveOrganizationUser(request: FastifyRequest) {
     requireOrganizationAdminActor(request);
     const { actorId } = z.object({ actorId: uuid }).parse(request.params);
@@ -567,14 +574,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       && isOrganizationAdmin(existing.roles)
       && (status !== "active" || !isOrganizationAdmin(roles))
     ) {
-      const users = await options.repository.listOrganizationUsers(request.actor.tenantId);
-      const otherActiveAdmins = users.filter(
-        (candidate) =>
-          candidate.actorId !== actorId
-          && candidate.status === "active"
-          && isOrganizationAdmin(candidate.roles),
-      );
-      if (otherActiveAdmins.length === 0) {
+      if (!await hasOtherUsableOrganizationAdmin(request.actor.tenantId, actorId)) {
         throw new AppError(
           "LAST_ADMIN_REQUIRED",
           "The last active organization administrator cannot be suspended or demoted",
