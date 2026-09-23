@@ -25,16 +25,17 @@ test("mobile auth uses an Expo-inlineable Neon Auth environment access", async (
   );
 });
 
-test("mobile email sign-in sends an absolute callback URL", async () => {
+test("mobile auth sends a trusted HTTPS Origin without redirecting email sign-in", async () => {
   const source = await readFile(new URL("./auth.ts", import.meta.url), "utf8");
   assert.match(
     source,
-    /MOBILE_AUTH_CALLBACK_URL = "https:\/\/[^"]+"/,
+    /MOBILE_AUTH_ORIGIN = "https:\/\/[^"]+"/,
   );
   assert.match(
     source,
-    /signIn\.email\(\{[\s\S]*callbackURL: MOBILE_AUTH_CALLBACK_URL,[\s\S]*\}\)/,
+    /fetchOptions:\s*\{[\s\S]*Origin: MOBILE_AUTH_ORIGIN,[\s\S]*\}/,
   );
+  assert.match(source, /signIn\.email\(\{ email, password \}\)/);
 });
 
 test("mobile token provider calls token() for each request and surfaces errors", async () => {
