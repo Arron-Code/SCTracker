@@ -268,16 +268,16 @@ function renderShipments() {
     </tr>`).join("");
 }
 
-function administrationActions(scope, id, stateValue) {
+function administrationActions(scope, id, stateValue, allowBlocking = true) {
   const trusted = stateValue === "LOCALLY_TRUSTED" || stateValue === "ORGANIZATION_VERIFIED";
   return `
     <div class="administration-actions">
       <button class="text-button" type="button" data-trust-scope="${scope}" data-trust-id="${escapeHtml(id)}" data-trust-state="${trusted ? "UNVERIFIED" : "LOCALLY_TRUSTED"}">
         ${escapeHtml(t(trusted ? "administration.unverify" : "administration.trust"))}
       </button>
-      <button class="text-button danger" type="button" data-trust-scope="${scope}" data-trust-id="${escapeHtml(id)}" data-trust-state="SUSPENDED">
+      ${allowBlocking ? `<button class="text-button danger" type="button" data-trust-scope="${scope}" data-trust-id="${escapeHtml(id)}" data-trust-state="SUSPENDED">
         ${escapeHtml(t("administration.suspend"))}
-      </button>
+      </button>` : ""}
     </div>`;
 }
 
@@ -303,13 +303,22 @@ function formatAdministrationDate(value) {
 
 function administrationUserActions(user) {
   const nextStatus = user.status === "suspended" ? "active" : "suspended";
+  const isLastAdmin = user.status === "active"
+    && user.roles?.includes("organization_admin")
+    && state.administration.users.filter(
+      (candidate) =>
+        candidate.actorId !== user.actorId
+        && candidate.status === "active"
+        && candidate.roles?.includes("organization_admin")
+        && !["SUSPENDED", "REVOKED"].includes(candidate.trustState),
+    ).length === 0;
   return `
     <div class="administration-actions">
       <button class="text-button" type="button" data-edit-user="${escapeHtml(user.actorId)}">${escapeHtml(t("administration.edit"))}</button>
-      <button class="text-button ${nextStatus === "suspended" ? "danger" : ""}" type="button" data-user-status="${nextStatus}" data-user-id="${escapeHtml(user.actorId)}">
+      <button class="text-button ${nextStatus === "suspended" ? "danger" : ""}" type="button" data-user-status="${nextStatus}" data-user-id="${escapeHtml(user.actorId)}" ${isLastAdmin && nextStatus === "suspended" ? "disabled" : ""}>
         ${escapeHtml(t(nextStatus === "suspended" ? "administration.suspend" : "administration.activate"))}
       </button>
-      ${administrationActions("user", user.actorId, user.trustState)}
+      ${administrationActions("user", user.actorId, user.trustState, !isLastAdmin)}
     </div>`;
 }
 
@@ -855,7 +864,22 @@ const dialogDefinitions = {
       if (roles.length === 0) {
         throw new ApiError("VALIDATION_ERROR", t("administration.roleRequired"), undefined, 400);
       }
-      return api.administration.saveUser(form.get("actorId").trim(), {
+      const actorId = form.get("actorId").trim();
+      const existing = state.administration.users.find((user) => user.actorId === actorId);
+      const removesLastAdmin = existing?.status === "active"
+        && existing.roles?.includes("organization_admin")
+        && (form.get("status") !== "active" || !roles.includes("organization_admin"))
+        && state.administration.users.filter(
+          (candidate) =>
+            candidate.actorId !== actorId
+            && candidate.status === "active"
+            && candidate.roles?.includes("organization_admin")
+            && !["SUSPENDED", "REVOKED"].includes(candidate.trustState),
+        ).length === 0;
+      if (removesLastAdmin) {
+        throw new ApiError("LAST_ADMIN_REQUIRED", t("administration.lastAdminRequired"), undefined, 409);
+      }
+      return api.administration.saveUser(actorId, {
         displayName: form.get("displayName").trim(),
         email: form.get("email").trim(),
         roles,

@@ -205,12 +205,12 @@ export function createApiClient(options = {}) {
     administration: {
       users: () => request("/admin/users"),
       saveUser: (actorId, input) =>
-        json("PUT", `/admin/users/${encodeURIComponent(actorId)}`, input),
+        json("PUT", `/admin/identity/users/${encodeURIComponent(actorId)}`, input),
       devices: () => request("/admin/devices"),
       deviceAttestations: (deviceId) =>
         request(`/admin/devices/${encodeURIComponent(deviceId)}/attestations`),
       setDeviceStatus: (deviceId, input) =>
-        json("POST", `/admin/devices/${encodeURIComponent(deviceId)}/status`, input),
+        json("POST", `/admin/identity/devices/${encodeURIComponent(deviceId)}/status`, input),
       keys: () => request("/admin/keys"),
       trustHistory: (scopeType, scopeId) =>
         request(
