@@ -1,12 +1,14 @@
 export class AuthError extends Error {
   constructor(
-    readonly code: "AUTH_NOT_CONFIGURED" | "AUTH_REQUIRED" | "AUTH_ERROR" | "AUTH_TIMEOUT",
+    readonly code: string,
     message: string,
   ) {
     super(message);
     this.name = "AuthError";
   }
 }
+
+export const EMAIL_VERIFICATION_OTP_LENGTH = 6;
 
 export type AuthSession = {
   session: {
@@ -78,4 +80,12 @@ export function passwordResetTokenFromUrl(url: string | null): string | null {
   } catch {
     return null;
   }
+}
+
+export function normalizeEmailVerificationOtp(value: string): string {
+  return value.replace(/\D/g, "").slice(0, EMAIL_VERIFICATION_OTP_LENGTH);
+}
+
+export function isValidEmailVerificationOtp(value: string): boolean {
+  return new RegExp(`^\\d{${EMAIL_VERIFICATION_OTP_LENGTH}}$`).test(value);
 }

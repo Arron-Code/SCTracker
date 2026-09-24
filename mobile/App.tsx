@@ -42,12 +42,21 @@ import {
   listOrganizations,
   requestPasswordReset,
   resetPassword,
+  sendEmailVerificationOtp,
   setActiveOrganization,
   signIn,
   signOut,
+  verifyEmailOtp,
 } from "./src/auth";
-import type { AuthOrganization, AuthSession } from "./src/auth-core";
-import { passwordResetTokenFromUrl, sessionFromSignInResult } from "./src/auth-core";
+import {
+  AuthError,
+  isValidEmailVerificationOtp,
+  normalizeEmailVerificationOtp,
+  passwordResetTokenFromUrl,
+  sessionFromSignInResult,
+  type AuthOrganization,
+  type AuthSession,
+} from "./src/auth-core";
 import {
   closePolygon,
   createUuid,
@@ -952,6 +961,11 @@ function ConflictCard({
   );
 }
 
+function isEmailVerificationRequired(error: unknown): boolean {
+  return (error instanceof AuthError && error.code === "EMAIL_NOT_VERIFIED")
+    || (error instanceof Error && error.message.toLowerCase().includes("email not verified"));
+}
+
 function AuthCard({
   session,
   organizations,
@@ -970,6 +984,10 @@ function AuthCard({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [verificationEmail, setVerificationEmail] = useState<string | null>(null);
+  const [verificationPassword, setVerificationPassword] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [verificationSent, setVerificationSent] = useState(false);
   const [resetToken, setResetToken] = useState<string | null>(null);
   const [resetRequested, setResetRequested] = useState(false);
   const [organizationName, setOrganizationName] = useState("");
@@ -1055,6 +1073,92 @@ function AuthCard({
   }
 
   if (!session) {
+    if (verificationEmail) {
+      return (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>{t.auth.verifyEmail}</Text>
+          <Text style={styles.description}>{t.auth.verifyEmailHelp}</Text>
+          <Text style={styles.caption}>{verificationEmail}</Text>
+          <Field
+            label={t.auth.verificationCode}
+            value={verificationCode}
+            onChangeText={(value) => setVerificationCode(normalizeEmailVerificationOtp(value))}
+            keyboardType="number-pad"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {verificationSent ? <Text style={styles.successText}>{t.auth.verificationSent}</Text> : null}
+          {actionError ?? error ? <Text style={styles.errorText}>{actionError ?? error}</Text> : null}
+          <Button
+            label={t.auth.confirmVerificationCode}
+            icon="checkmark-circle"
+            disabled={submitting || !isValidEmailVerificationOtp(verificationCode)}
+            loading={submitting}
+            onPress={() => void (async () => {
+              setSubmitting(true);
+              setActionError(null);
+              setVerificationSent(false);
+              try {
+                await verifyEmailOtp(verificationEmail, verificationCode);
+                const result = await signIn(verificationEmail, verificationPassword);
+                const fallbackSession = sessionFromSignInResult(result);
+                if (!fallbackSession) {
+                  throw new Error("Sign-in succeeded without a valid user session.");
+                }
+                setVerificationEmail(null);
+                setVerificationPassword("");
+                setVerificationCode("");
+                setPassword("");
+                await refresh(fallbackSession);
+              } catch (nextError) {
+                const invalidCode = nextError instanceof AuthError
+                  && ["INVALID_OTP", "OTP_EXPIRED", "TOO_MANY_ATTEMPTS"].includes(nextError.code);
+                setActionError(
+                  invalidCode
+                    ? t.auth.verificationInvalid
+                    : nextError instanceof Error ? nextError.message : String(nextError),
+                );
+              } finally {
+                setSubmitting(false);
+              }
+            })()}
+          />
+          <Button
+            label={t.auth.resendVerificationCode}
+            icon="mail"
+            secondary
+            disabled={submitting}
+            onPress={() => void (async () => {
+              setSubmitting(true);
+              setActionError(null);
+              setVerificationSent(false);
+              try {
+                await sendEmailVerificationOtp(verificationEmail);
+                setVerificationSent(true);
+              } catch (nextError) {
+                setActionError(nextError instanceof Error ? nextError.message : String(nextError));
+              } finally {
+                setSubmitting(false);
+              }
+            })()}
+          />
+          <Button
+            label={t.auth.backToSignIn}
+            icon="arrow-back"
+            secondary
+            disabled={submitting}
+            onPress={() => {
+              setVerificationEmail(null);
+              setVerificationPassword("");
+              setVerificationCode("");
+              setVerificationSent(false);
+              setActionError(null);
+            }}
+          />
+        </View>
+      );
+    }
+
     return (
       <View style={styles.card}>
         <Text style={styles.cardTitle}>{t.auth.signIn}</Text>
@@ -1086,14 +1190,29 @@ function AuthCard({
             setSigningIn(true);
             setActionError(null);
             try {
-              const result = await signIn(email.trim(), password);
+              const normalizedEmail = email.trim();
+              const result = await signIn(normalizedEmail, password);
               const fallbackSession = sessionFromSignInResult(result);
               if (!fallbackSession) {
                 throw new Error("Sign-in succeeded without a valid user session.");
               }
               await refresh(fallbackSession);
             } catch (nextError) {
-              setActionError(nextError instanceof Error ? nextError.message : String(nextError));
+              if (isEmailVerificationRequired(nextError)) {
+                const normalizedEmail = email.trim();
+                setVerificationEmail(normalizedEmail);
+                setVerificationPassword(password);
+                setVerificationCode("");
+                setVerificationSent(false);
+                try {
+                  await sendEmailVerificationOtp(normalizedEmail);
+                  setVerificationSent(true);
+                } catch (otpError) {
+                  setActionError(otpError instanceof Error ? otpError.message : String(otpError));
+                }
+              } else {
+                setActionError(nextError instanceof Error ? nextError.message : String(nextError));
+              }
             } finally {
               setSubmitting(false);
               setSigningIn(false);

@@ -4,7 +4,10 @@ import { readFile } from "node:fs/promises";
 
 import {
   AuthError,
+  EMAIL_VERIFICATION_OTP_LENGTH,
   getNeonAuthUrl,
+  isValidEmailVerificationOtp,
+  normalizeEmailVerificationOtp,
   tokenFromClient,
   passwordResetTokenFromUrl,
   sessionFromSignInResult,
@@ -43,6 +46,14 @@ test("mobile auth sends a trusted HTTPS Origin without redirecting email sign-in
   );
   assert.match(source, /SecureStore\.deleteItemAsync\(EXPO_COOKIE_STORAGE_KEY\)/);
   assert.match(source, /Authorization: `Bearer \$\{sessionToken\}`/);
+});
+
+test("mobile auth exposes Neon email verification OTP operations", async () => {
+  const source = await readFile(new URL("./auth.ts", import.meta.url), "utf8");
+  assert.match(source, /emailOTPClient\(\)/);
+  assert.match(source, /emailOtp\.sendVerificationOtp\(\{/);
+  assert.match(source, /type: "email-verification"/);
+  assert.match(source, /emailOtp\.verifyEmail\(\{ email, otp \}\)/);
 });
 
 test("mobile token provider calls token() for each request and surfaces errors", async () => {
@@ -105,4 +116,12 @@ test("mobile reset links expose only reset-password tokens", () => {
   );
   assert.equal(passwordResetTokenFromUrl("sctracker://other?token=temporary-token"), null);
   assert.equal(passwordResetTokenFromUrl("not-a-url"), null);
+});
+
+test("email verification OTP accepts exactly six digits", () => {
+  assert.equal(EMAIL_VERIFICATION_OTP_LENGTH, 6);
+  assert.equal(normalizeEmailVerificationOtp("12a 34-567"), "123456");
+  assert.equal(isValidEmailVerificationOtp("123456"), true);
+  assert.equal(isValidEmailVerificationOtp("12345"), false);
+  assert.equal(isValidEmailVerificationOtp("12345a"), false);
 });

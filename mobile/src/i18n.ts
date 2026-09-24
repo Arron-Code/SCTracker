@@ -120,6 +120,13 @@ export type Translation = {
     newPassword: string;
     confirmPassword: string;
     backToSignIn: string;
+    verifyEmail: string;
+    verifyEmailHelp: string;
+    verificationCode: string;
+    confirmVerificationCode: string;
+    resendVerificationCode: string;
+    verificationSent: string;
+    verificationInvalid: string;
     organization: string;
     organizationRequired: string;
     organizationName: string;
@@ -199,6 +206,10 @@ export const translations = {
       forgotPassword: "Passwort vergessen?", resetSent: "Reset-Link wurde an Ihre E-Mail-Adresse gesendet.",
       resetPassword: "Passwort zurücksetzen", resetPasswordHelp: "Legen Sie ein neues Passwort mit mindestens 8 Zeichen fest.",
       newPassword: "Neues Passwort", confirmPassword: "Passwort bestätigen", backToSignIn: "Zurück zur Anmeldung",
+      verifyEmail: "E-Mail bestätigen", verifyEmailHelp: "Geben Sie den sechsstelligen Code aus Ihrer E-Mail ein.",
+      verificationCode: "Verifizierungscode", confirmVerificationCode: "Code bestätigen",
+      resendVerificationCode: "Code erneut senden", verificationSent: "Ein neuer Code wurde an Ihre E-Mail-Adresse gesendet.",
+      verificationInvalid: "Der Code ist ungültig oder abgelaufen. Fordern Sie bei Bedarf einen neuen Code an.",
       organizationRequired: "Wählen oder erstellen Sie eine Organisation, bevor Sie synchronisieren.",
       organizationName: "Organisationsname", organizationSlug: "Organisationskürzel",
       createOrganization: "Organisation erstellen", notConfigured: "Neon Auth nicht konfiguriert",
@@ -272,6 +283,10 @@ export const translations = {
       forgotPassword: "Forgot password?", resetSent: "A reset link was sent to your email address.",
       resetPassword: "Reset password", resetPasswordHelp: "Choose a new password with at least 8 characters.",
       newPassword: "New password", confirmPassword: "Confirm password", backToSignIn: "Back to sign in",
+      verifyEmail: "Verify email", verifyEmailHelp: "Enter the six-digit code from your email.",
+      verificationCode: "Verification code", confirmVerificationCode: "Confirm code",
+      resendVerificationCode: "Resend code", verificationSent: "A new code was sent to your email address.",
+      verificationInvalid: "The code is invalid or expired. Request a new code if needed.",
       organizationRequired: "Select or create an organization before synchronizing.",
       organizationName: "Organization name", organizationSlug: "Organization slug",
       createOrganization: "Create organization", notConfigured: "Neon Auth not configured",
@@ -345,6 +360,10 @@ export const translations = {
       forgotPassword: "የይለፍ ቃል ረሱ?", resetSent: "የዳግም ማስጀመሪያ ሊንክ ወደ ኢሜይልዎ ተልኳል።",
       resetPassword: "የይለፍ ቃል ዳግም ያስጀምሩ", resetPasswordHelp: "ቢያንስ 8 ቁምፊ ያለው አዲስ የይለፍ ቃል ይምረጡ።",
       newPassword: "አዲስ የይለፍ ቃል", confirmPassword: "የይለፍ ቃል ያረጋግጡ", backToSignIn: "ወደ መግቢያ ተመለስ",
+      verifyEmail: "ኢሜይል ያረጋግጡ", verifyEmailHelp: "በኢሜይልዎ የተላከውን ባለስድስት አሃዝ ኮድ ያስገቡ።",
+      verificationCode: "የማረጋገጫ ኮድ", confirmVerificationCode: "ኮድ ያረጋግጡ",
+      resendVerificationCode: "ኮድ እንደገና ላክ", verificationSent: "አዲስ ኮድ ወደ ኢሜይልዎ ተልኳል።",
+      verificationInvalid: "ኮዱ የተሳሳተ ወይም ጊዜው ያለፈ ነው። አዲስ ኮድ ይጠይቁ።",
       organizationRequired: "ከማመሳሰልዎ በፊት ድርጅት ይምረጡ ወይም ይፍጠሩ።",
       organizationName: "የድርጅት ስም", organizationSlug: "የድርጅት አጭር መለያ",
       createOrganization: "ድርጅት ፍጠር", notConfigured: "Neon Auth አልተዋቀረም",
@@ -418,6 +437,10 @@ export const translations = {
       forgotPassword: "መሕለፊ ቓል ረሲዕኩም?", resetSent: "መሕለፊ ቓል ንምቕያር መላግቦ ናብ ኢመይልኩም ተላኢኹ።",
       resetPassword: "መሕለፊ ቓል ቀይሩ", resetPasswordHelp: "እንተወሓደ 8 ፊደላት ዘለዎ ሓድሽ መሕለፊ ቓል ምረጹ።",
       newPassword: "ሓድሽ መሕለፊ ቓል", confirmPassword: "መሕለፊ ቓል ኣረጋግጹ", backToSignIn: "ናብ መእተዊ ተመለሱ",
+      verifyEmail: "ኢመይል ኣረጋግጹ", verifyEmailHelp: "ኣብ ኢመይልኩም ዝተላእከ ሽዱሽተ ኣሃዝ ኮድ ኣእትዉ።",
+      verificationCode: "ናይ ምርግጋጽ ኮድ", confirmVerificationCode: "ኮድ ኣረጋግጹ",
+      resendVerificationCode: "ኮድ እንደገና ስደዱ", verificationSent: "ሓድሽ ኮድ ናብ ኢመይልኩም ተላኢኹ።",
+      verificationInvalid: "እቲ ኮድ ጌጋ ወይ ግዜኡ ዝሓለፈ እዩ። ሓድሽ ኮድ ሕተቱ።",
       organizationRequired: "ቅድሚ ምትእስሳር ትካል ምረጹ ወይ ፍጠሩ።",
       organizationName: "ስም ትካል", organizationSlug: "ሓጺር መለለዪ ትካል",
       createOrganization: "ትካል ፍጠር", notConfigured: "Neon Auth ኣይተዋቐረን",

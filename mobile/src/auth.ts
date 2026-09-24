@@ -1,6 +1,6 @@
 import { expoClient } from "@better-auth/expo/client";
 import { createAuthClient } from "better-auth/react";
-import { jwtClient, organizationClient } from "better-auth/client/plugins";
+import { emailOTPClient, jwtClient, organizationClient } from "better-auth/client/plugins";
 import * as SecureStore from "expo-secure-store";
 import {
   AuthError,
@@ -25,6 +25,7 @@ const client = baseURL
       },
       plugins: [
         jwtClient(),
+        emailOTPClient(),
         organizationClient(),
         expoClient({
           scheme: "sctracker",
@@ -46,11 +47,11 @@ function requireClient() {
 }
 
 function unwrap<T>(
-  result: { data?: T | null; error?: { message?: string } | null },
+  result: { data?: T | null; error?: { message?: string; code?: string } | null },
   fallback: string,
 ): T | null {
   if (result.error) {
-    throw new AuthError("AUTH_ERROR", result.error.message ?? fallback);
+    throw new AuthError(result.error.code ?? "AUTH_ERROR", result.error.message ?? fallback);
   }
   return result.data ?? null;
 }
@@ -135,6 +136,29 @@ export async function resetPassword(newPassword: string, token: string) {
       "The password reset request timed out. Please try again.",
     ),
     "Could not reset the password.",
+  );
+}
+
+export async function sendEmailVerificationOtp(email: string) {
+  return unwrap(
+    await authRequest(
+      requireClient().emailOtp.sendVerificationOtp({
+        email,
+        type: "email-verification",
+      }),
+      "Sending the verification code timed out. Please try again.",
+    ),
+    "Could not send the verification code.",
+  );
+}
+
+export async function verifyEmailOtp(email: string, otp: string) {
+  return unwrap(
+    await authRequest(
+      requireClient().emailOtp.verifyEmail({ email, otp }),
+      "Email verification timed out. Please try again.",
+    ),
+    "Could not verify the email address.",
   );
 }
 
