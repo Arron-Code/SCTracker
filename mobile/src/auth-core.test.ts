@@ -7,6 +7,7 @@ import {
   getNeonAuthUrl,
   tokenFromClient,
   passwordResetTokenFromUrl,
+  sessionFromSignInResult,
 } from "./auth-core";
 
 test("mobile Neon Auth URL is runtime-configurable", () => {
@@ -61,6 +62,28 @@ test("mobile token provider calls token() for each request and surfaces errors",
     }),
     (error) => error instanceof AuthError && error.code === "AUTH_ERROR",
   );
+});
+
+test("successful mobile sign-in can seed the session before follow-up requests", () => {
+  assert.deepEqual(
+    sessionFromSignInResult({
+      token: "opaque-session-token",
+      user: {
+        id: "user-id",
+        email: "person@example.test",
+        name: "Person",
+      },
+    }),
+    {
+      session: { activeOrganizationId: null },
+      user: {
+        id: "user-id",
+        email: "person@example.test",
+        name: "Person",
+      },
+    },
+  );
+  assert.equal(sessionFromSignInResult({ user: { id: "missing-fields" } }), null);
 });
 
 test("mobile auth code never persists raw JWTs in AsyncStorage or localStorage", async () => {

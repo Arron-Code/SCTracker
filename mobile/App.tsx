@@ -47,7 +47,7 @@ import {
   signOut,
 } from "./src/auth";
 import type { AuthOrganization, AuthSession } from "./src/auth-core";
-import { passwordResetTokenFromUrl } from "./src/auth-core";
+import { passwordResetTokenFromUrl, sessionFromSignInResult } from "./src/auth-core";
 import {
   closePolygon,
   createUuid,
@@ -964,7 +964,7 @@ function AuthCard({
   organizations: AuthOrganization[];
   loading: boolean;
   error: string | null;
-  refresh: () => Promise<void>;
+  refresh: (fallbackSession?: AuthSession | null) => Promise<void>;
   t: Translation;
 }) {
   const [email, setEmail] = useState("");
@@ -1082,10 +1082,20 @@ function AuthCard({
           disabled={submitting || !email.trim() || !password}
           loading={signingIn}
           onPress={() => void (async () => {
+            setSubmitting(true);
             setSigningIn(true);
+            setActionError(null);
             try {
-              await run(() => signIn(email.trim(), password));
+              const result = await signIn(email.trim(), password);
+              const fallbackSession = sessionFromSignInResult(result);
+              if (!fallbackSession) {
+                throw new Error("Sign-in succeeded without a valid user session.");
+              }
+              await refresh(fallbackSession);
+            } catch (nextError) {
+              setActionError(nextError instanceof Error ? nextError.message : String(nextError));
             } finally {
+              setSubmitting(false);
               setSigningIn(false);
             }
           })()}
@@ -1230,24 +1240,40 @@ export default function App() {
     : "local";
   const wideLayout = width >= 840 && width > height;
 
-  async function refreshAuth() {
+  async function refreshAuth(fallbackSession: AuthSession | null = null) {
     if (!authConfigured) {
       setAuthLoading(false);
       return;
     }
     setAuthLoading(true);
     setAuthError(null);
+    let nextSession: AuthSession | null = fallbackSession;
     try {
-      const nextSession = await getSession();
+      nextSession = await getSession() ?? fallbackSession;
       setAuthSession(nextSession);
-      setOrganizations(nextSession ? await listOrganizations() : []);
     } catch (error) {
-      setAuthSession(null);
+      setAuthSession(fallbackSession);
+      if (!fallbackSession) {
+        setOrganizations([]);
+        setAuthError(error instanceof Error ? error.message : String(error));
+        setAuthLoading(false);
+        return;
+      }
+    }
+
+    if (!nextSession) {
+      setOrganizations([]);
+      setAuthLoading(false);
+      return;
+    }
+
+    try {
+      setOrganizations(await listOrganizations());
+    } catch (error) {
       setOrganizations([]);
       setAuthError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setAuthLoading(false);
     }
+    setAuthLoading(false);
   }
 
   useEffect(() => {

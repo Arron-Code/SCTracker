@@ -25,6 +25,28 @@ export type AuthOrganization = {
   slug: string;
 };
 
+export function sessionFromSignInResult(result: unknown): AuthSession | null {
+  if (!result || typeof result !== "object" || !("user" in result)) return null;
+  const user = result.user;
+  if (!user || typeof user !== "object") return null;
+  if (
+    !("id" in user) || typeof user.id !== "string"
+    || !("email" in user) || typeof user.email !== "string"
+    || !("name" in user) || typeof user.name !== "string"
+  ) {
+    return null;
+  }
+
+  return {
+    session: { activeOrganizationId: null },
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+    },
+  };
+}
+
 type TokenClient = {
   token: () => Promise<{
     data?: { token?: string | null } | null;
