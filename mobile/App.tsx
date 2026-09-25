@@ -36,7 +36,6 @@ import {
 } from "./src/api";
 import {
   authConfigured,
-  createOrganization,
   getAccessToken,
   getSession,
   listOrganizations,
@@ -990,8 +989,6 @@ function AuthCard({
   const [verificationSent, setVerificationSent] = useState(false);
   const [resetToken, setResetToken] = useState<string | null>(null);
   const [resetRequested, setResetRequested] = useState(false);
-  const [organizationName, setOrganizationName] = useState("");
-  const [organizationSlug, setOrganizationSlug] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -1271,19 +1268,8 @@ function AuthCard({
         </Pressable>
       ))}
       {!activeOrganizationId ? <Text style={styles.errorText}>{t.auth.organizationRequired}</Text> : null}
-      <Field label={t.auth.organizationName} value={organizationName} onChangeText={setOrganizationName} />
-      <Field label={t.auth.organizationSlug} value={organizationSlug} onChangeText={setOrganizationSlug} />
+      <Text style={styles.description}>{t.auth.organizationManagedCentrally}</Text>
       {actionError ?? error ? <Text style={styles.errorText}>{actionError ?? error}</Text> : null}
-      <Button
-        label={t.auth.createOrganization}
-        icon="business"
-        disabled={submitting || !organizationName.trim() || !organizationSlug.trim()}
-        onPress={() => void run(async () => {
-          await createOrganization(organizationName.trim(), organizationSlug.trim());
-          setOrganizationName("");
-          setOrganizationSlug("");
-        })}
-      />
     </View>
   );
 }

@@ -132,6 +132,7 @@ export type Translation = {
     organizationName: string;
     organizationSlug: string;
     createOrganization: string;
+    organizationManagedCentrally: string;
     notConfigured: string;
     notConfiguredDetail: string;
   };
@@ -213,6 +214,7 @@ export const translations = {
       organizationRequired: "Wählen oder erstellen Sie eine Organisation, bevor Sie synchronisieren.",
       organizationName: "Organisationsname", organizationSlug: "Organisationskürzel",
       createOrganization: "Organisation erstellen", notConfigured: "Neon Auth nicht konfiguriert",
+      organizationManagedCentrally: "Organisationen und Mitgliedschaften werden in der SCTracker-Web-Administration verwaltet.",
       notConfiguredDetail: "EXPO_PUBLIC_NEON_AUTH_URL fehlt. Offline-Erfassung bleibt verfügbar; Synchronisierung ist blockiert.",
     },
   },
@@ -290,6 +292,7 @@ export const translations = {
       organizationRequired: "Select or create an organization before synchronizing.",
       organizationName: "Organization name", organizationSlug: "Organization slug",
       createOrganization: "Create organization", notConfigured: "Neon Auth not configured",
+      organizationManagedCentrally: "Organizations and memberships are managed in the SCTracker web administration.",
       notConfiguredDetail: "EXPO_PUBLIC_NEON_AUTH_URL is missing. Offline capture remains available; synchronization is blocked.",
     },
   },
@@ -367,6 +370,7 @@ export const translations = {
       organizationRequired: "ከማመሳሰልዎ በፊት ድርጅት ይምረጡ ወይም ይፍጠሩ።",
       organizationName: "የድርጅት ስም", organizationSlug: "የድርጅት አጭር መለያ",
       createOrganization: "ድርጅት ፍጠር", notConfigured: "Neon Auth አልተዋቀረም",
+      organizationManagedCentrally: "ድርጅቶች እና አባልነቶች በSCTracker ድር አስተዳደር ውስጥ ይተዳደራሉ።",
       notConfiguredDetail: "EXPO_PUBLIC_NEON_AUTH_URL የለም። ከመስመር ውጭ መመዝገብ ይቀጥላል፤ ማመሳሰል ታግዷል።",
     },
   },
@@ -444,6 +448,7 @@ export const translations = {
       organizationRequired: "ቅድሚ ምትእስሳር ትካል ምረጹ ወይ ፍጠሩ።",
       organizationName: "ስም ትካል", organizationSlug: "ሓጺር መለለዪ ትካል",
       createOrganization: "ትካል ፍጠር", notConfigured: "Neon Auth ኣይተዋቐረን",
+      organizationManagedCentrally: "ትካላትን ኣባልነትን ኣብ SCTracker ዌብ ምምሕዳር ይመሓደሩ።",
       notConfiguredDetail: "EXPO_PUBLIC_NEON_AUTH_URL የለን። ካብ መስመር ወጻኢ ምምዝጋብ ይቕጽል፤ ምትእስሳር ተዓጽዩ።",
     },
   },

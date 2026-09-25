@@ -1359,7 +1359,7 @@ tr:last-child td {
 
 .administration-summary {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
   margin: 18px 0;
 }
@@ -1396,6 +1396,11 @@ tr:last-child td {
   background: linear-gradient(145deg, #f7faff, #edf4fb);
 }
 
+.organization-stat {
+  border-color: rgba(107, 76, 149, 0.18);
+  background: linear-gradient(145deg, #fbf8ff, #f1ebf8);
+}
+
 .device-stat {
   border-color: rgba(21, 120, 107, 0.18);
   background: linear-gradient(145deg, #f5fbf9, #e9f5f1);
@@ -1416,6 +1421,11 @@ tr:last-child td {
 .administration-users-zone {
   border-color: rgba(59, 104, 150, 0.22);
   background: linear-gradient(180deg, rgba(237, 244, 251, 0.88), rgba(255, 255, 255, 0.96) 220px);
+}
+
+.administration-organizations-zone {
+  border-color: rgba(107, 76, 149, 0.22);
+  background: linear-gradient(180deg, rgba(245, 239, 251, 0.9), rgba(255, 255, 255, 0.96) 260px);
 }
 
 .administration-devices-zone {
@@ -1444,6 +1454,54 @@ tr:last-child td {
 
 .administration-users-zone .eyebrow {
   color: #3b6896;
+}
+
+.administration-organizations-zone .eyebrow {
+  color: #6b4c95;
+}
+
+.organization-management-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.organization-management-card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  margin: 0;
+}
+
+.organization-management-card h4,
+.administration-organizations-zone .administration-table-card h4 {
+  margin: 0;
+}
+
+.organization-management-card > label,
+.administration-inline-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.organization-management-card input,
+.organization-management-card select {
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 11px;
+  border: 1px solid rgba(84, 105, 94, 0.28);
+  border-radius: 10px;
+  color: var(--ink);
+  background: white;
+}
+
+.administration-inline-form {
+  display: grid;
+  gap: 12px;
 }
 
 .administration-devices-zone .eyebrow {
@@ -1672,6 +1730,10 @@ tr:last-child td {
 
   .administration-toolbar,
   .administration-users-zone .administration-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .organization-management-grid {
     grid-template-columns: 1fr;
   }
 

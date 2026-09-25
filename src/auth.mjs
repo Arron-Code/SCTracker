@@ -51,6 +51,32 @@ async function fetchAuthJson(fetchImpl, url, fallbackMessage) {
   return response.json();
 }
 
+async function requestAuthJson(fetchImpl, url, fallbackMessage, init = {}) {
+  if (!fetchImpl) {
+    throw new AuthError("AUTH_ERROR", "Fetch is not available.");
+  }
+  const headers = new Headers(init.headers);
+  headers.set("accept", "application/json");
+  if (init.body) headers.set("content-type", "application/json");
+  const response = await fetchImpl(url, {
+    ...init,
+    cache: "no-store",
+    credentials: "include",
+    headers,
+  });
+  const payload = response.headers.get("content-type")?.includes("application/json")
+    ? await response.json()
+    : null;
+  if (!response.ok) {
+    throw new AuthError(
+      payload?.code ?? payload?.error?.code ?? "AUTH_ERROR",
+      payload?.message ?? payload?.error?.message ?? `${fallbackMessage} (${response.status}).`,
+      payload,
+    );
+  }
+  return payload;
+}
+
 export function tokenFromClient(client) {
   return client.token().then((result) => unwrap(result, "Could not obtain an access token.")?.token ?? null);
 }
@@ -145,5 +171,78 @@ export function createManagedAuth(options = {}) {
       await requireClient().organization.setActive({ organizationId }),
       "Could not select the organization.",
     ),
+    listOrganizationMembers: async (organizationId) => {
+      requireClient();
+      const query = new URLSearchParams({
+        organizationId,
+        limit: "100",
+      });
+      const result = await requestAuthJson(
+        fetchImpl,
+        `${baseUrl}/organization/list-members?${query}`,
+        "Could not load organization members",
+      );
+      return {
+        members: Array.isArray(result?.members) ? result.members : [],
+        total: Number(result?.total ?? result?.members?.length ?? 0),
+      };
+    },
+    listOrganizationInvitations: async () => {
+      requireClient();
+      const result = await requestAuthJson(
+        fetchImpl,
+        `${baseUrl}/organization/list-invitations`,
+        "Could not load organization invitations",
+      );
+      return Array.isArray(result) ? result : [];
+    },
+    inviteOrganizationMember: async (email, role, organizationId) => {
+      requireClient();
+      return requestAuthJson(
+        fetchImpl,
+        `${baseUrl}/organization/invite-member`,
+        "Could not invite the organization member",
+        {
+          method: "POST",
+          body: JSON.stringify({ email, role, organizationId, resend: true }),
+        },
+      );
+    },
+    updateOrganizationMemberRole: async (memberId, role, organizationId) => {
+      requireClient();
+      return requestAuthJson(
+        fetchImpl,
+        `${baseUrl}/organization/update-member-role`,
+        "Could not update the organization role",
+        {
+          method: "POST",
+          body: JSON.stringify({ memberId, role, organizationId }),
+        },
+      );
+    },
+    removeOrganizationMember: async (memberIdOrEmail, organizationId) => {
+      requireClient();
+      return requestAuthJson(
+        fetchImpl,
+        `${baseUrl}/organization/remove-member`,
+        "Could not remove the organization member",
+        {
+          method: "POST",
+          body: JSON.stringify({ memberIdOrEmail, organizationId }),
+        },
+      );
+    },
+    cancelOrganizationInvitation: async (invitationId) => {
+      requireClient();
+      return requestAuthJson(
+        fetchImpl,
+        `${baseUrl}/organization/cancel-invitation`,
+        "Could not cancel the organization invitation",
+        {
+          method: "POST",
+          body: JSON.stringify({ invitationId }),
+        },
+      );
+    },
   };
 }

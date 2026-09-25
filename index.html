@@ -351,7 +351,91 @@
             <button class="secondary-button" id="administration-refresh" type="button" data-i18n="common.refresh">Aktualisieren</button>
           </div>
           <div class="resource-state error" id="administration-error" role="alert" hidden></div>
+          <section class="administration-zone administration-organizations-zone" aria-labelledby="administration-organizations-title">
+            <div class="administration-zone-header">
+              <div>
+                <p class="eyebrow" data-i18n="administration.organizationsEyebrow">NEON AUTH</p>
+                <h3 id="administration-organizations-title" data-i18n="administration.organizationAdministration">Organisationen und Mitgliedschaften</h3>
+                <p data-i18n="administration.organizationDescription">Login-Organisationen zentral auswählen, erstellen und Benutzer per E-Mail verbinden.</p>
+              </div>
+            </div>
+            <div class="organization-management-grid">
+              <article class="panel organization-management-card">
+                <h4 data-i18n="administration.organizations">Organisationen</h4>
+                <label>
+                  <span data-i18n="administration.managedOrganization">Verwaltete Organisation</span>
+                  <select id="administration-organization-select"></select>
+                </label>
+                <form id="administration-organization-form" class="administration-inline-form">
+                  <label>
+                    <span data-i18n="auth.organizationName">Organisationsname</span>
+                    <input name="name" required />
+                  </label>
+                  <label>
+                    <span data-i18n="auth.organizationSlug">Organisationskürzel</span>
+                    <input name="slug" pattern="[a-z0-9-]+" required />
+                  </label>
+                  <button class="primary-button" type="submit" data-i18n="administration.createOrganization">Organisation erstellen</button>
+                </form>
+              </article>
+              <article class="panel organization-management-card">
+                <h4 data-i18n="administration.connectUser">Benutzer verbinden</h4>
+                <p data-i18n="administration.connectUserHelp">Eine Einladung verbindet das Login-Konto mit der ausgewählten Organisation.</p>
+                <form id="administration-member-invite-form" class="administration-inline-form">
+                  <label>
+                    <span data-i18n="auth.email">E-Mail</span>
+                    <input name="email" type="email" autocomplete="email" required />
+                  </label>
+                  <label>
+                    <span data-i18n="administration.organizationRole">Organisationsrolle</span>
+                    <select name="role">
+                      <option value="member" data-i18n="administration.roleMember">Mitglied</option>
+                      <option value="admin" data-i18n="administration.roleOrganizationAdmin">Administrator</option>
+                    </select>
+                  </label>
+                  <button class="primary-button" type="submit" data-i18n="administration.sendInvitation">Einladung senden</button>
+                </form>
+              </article>
+            </div>
+            <article class="panel table-panel administration-table-card">
+              <h4 data-i18n="administration.members">Mitglieder</h4>
+              <div class="responsive-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th data-i18n="administration.identity">Identität</th>
+                      <th data-i18n="administration.organizationRole">Organisationsrolle</th>
+                      <th data-i18n="administration.joinedAt">Beigetreten</th>
+                      <th data-i18n="administration.actions">Aktionen</th>
+                    </tr>
+                  </thead>
+                  <tbody id="administration-members"></tbody>
+                </table>
+              </div>
+            </article>
+            <article class="panel table-panel administration-table-card">
+              <h4 data-i18n="administration.pendingInvitations">Offene Einladungen</h4>
+              <div class="responsive-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th data-i18n="auth.email">E-Mail</th>
+                      <th data-i18n="administration.organizationRole">Organisationsrolle</th>
+                      <th data-i18n="administration.status">Status</th>
+                      <th data-i18n="administration.actions">Aktionen</th>
+                    </tr>
+                  </thead>
+                  <tbody id="administration-invitations"></tbody>
+                </table>
+              </div>
+            </article>
+          </section>
           <div class="administration-summary" aria-label="Verwaltungsübersicht" data-i18n-aria-label="administration.summary">
+            <article class="administration-stat organization-stat">
+              <span data-i18n="administration.totalOrganizations">Organisationen</span>
+              <strong id="administration-organization-count">0</strong>
+              <small id="administration-member-count">0 Mitglieder</small>
+            </article>
             <article class="administration-stat user-stat">
               <span data-i18n="administration.totalUsers">Benutzer gesamt</span>
               <strong id="administration-user-count">0</strong>
@@ -376,7 +460,6 @@
                 <h3 id="administration-users-title" data-i18n="administration.userAdministration">Benutzeradministration</h3>
                 <p data-i18n="administration.userDescription">Identitäten, Rollen, Zugriffsstatus und organisatorisches Vertrauen zentral steuern.</p>
               </div>
-              <button class="primary-button administration-add-user" id="administration-add-user" type="button" data-i18n="administration.addUser">Benutzer hinzufügen</button>
             </div>
             <div class="administration-toolbar">
               <label class="administration-search">
@@ -651,17 +734,7 @@
             <select id="organization-select"></select>
           </label>
           <button class="secondary-button" id="organization-select-button" type="button" data-i18n="auth.select">Auswählen</button>
-          <form class="auth-form nested" id="organization-form">
-            <label>
-              <span data-i18n="auth.organizationName">Organisationsname</span>
-              <input name="name" required />
-            </label>
-            <label>
-              <span data-i18n="auth.organizationSlug">Organisationskürzel</span>
-              <input name="slug" pattern="[a-z0-9-]+" required />
-            </label>
-            <button class="primary-button" type="submit" data-i18n="auth.createOrganization">Organisation erstellen</button>
-          </form>
+          <p data-i18n="auth.organizationManagedCentrally">Organisationen und Mitgliedschaften werden in der Web-Administration verwaltet.</p>
           <button class="secondary-button" id="sign-out-button" type="button" data-i18n="auth.signOut">Abmelden</button>
         </section>
       </div>
@@ -675,6 +748,6 @@
         SC_TRACKER_AUTH_PROVIDERS: ["google"],
       };
     </script>
-    <script type="module" src="app.js?v=13"></script>
+    <script type="module" src="app.js?v=14"></script>
   </body>
 </html>

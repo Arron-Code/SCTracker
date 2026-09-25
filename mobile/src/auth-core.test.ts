@@ -56,6 +56,13 @@ test("mobile auth exposes Neon email verification OTP operations", async () => {
   assert.match(source, /emailOtp\.verifyEmail\(\{ email, otp \}\)/);
 });
 
+test("mobile organization management only selects centrally assigned organizations", async () => {
+  const source = await readFile(new URL("./auth.ts", import.meta.url), "utf8");
+  assert.match(source, /organization\.list\(\{/);
+  assert.match(source, /organization\.setActive\(\{/);
+  assert.doesNotMatch(source, /organization\.create\(\{/);
+});
+
 test("mobile token provider calls token() for each request and surfaces errors", async () => {
   let calls = 0;
   const client = {

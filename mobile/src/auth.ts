@@ -188,21 +188,6 @@ export async function listOrganizations(): Promise<AuthOrganization[]> {
   ) ?? []) as AuthOrganization[];
 }
 
-export async function createOrganization(name: string, slug: string) {
-  return unwrap(
-    await authRequest(
-      requireClient().organization.create({
-        name,
-        slug,
-        keepCurrentActiveOrganization: false,
-        fetchOptions: authenticatedFetchOptions(),
-      }),
-      "Creating the organization timed out. Please try again.",
-    ),
-    "Could not create the organization.",
-  );
-}
-
 export async function setActiveOrganization(organizationId: string) {
   return unwrap(
     await authRequest(

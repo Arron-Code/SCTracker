@@ -137,6 +137,65 @@ test("password reset and social sign-in delegate to Neon Auth", async () => {
   ]);
 });
 
+test("organization administration uses Neon Auth membership endpoints", async () => {
+  const calls = [];
+  const responses = new Map([
+    ["/organization/list-members?organizationId=org-1&limit=100", {
+      members: [{ id: "member-1", role: "member" }],
+      total: 1,
+    }],
+    ["/organization/list-invitations", [{ id: "invite-1", email: "new@example.test" }]],
+  ]);
+  const auth = createManagedAuth({
+    config: { SC_TRACKER_NEON_AUTH_URL: "https://auth.example.test/auth" },
+    createClient: () => ({}),
+    fetchImpl: async (url, init) => {
+      const parsed = new URL(url);
+      calls.push({ path: `${parsed.pathname.replace("/auth", "")}${parsed.search}`, init });
+      const payload = responses.get(`${parsed.pathname.replace("/auth", "")}${parsed.search}`) ?? { success: true };
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  });
+
+  assert.deepEqual(await auth.listOrganizationMembers("org-1"), {
+    members: [{ id: "member-1", role: "member" }],
+    total: 1,
+  });
+  assert.deepEqual(await auth.listOrganizationInvitations(), [
+    { id: "invite-1", email: "new@example.test" },
+  ]);
+  await auth.inviteOrganizationMember("new@example.test", "member", "org-1");
+  await auth.updateOrganizationMemberRole("member-1", "admin", "org-1");
+  await auth.removeOrganizationMember("member-1", "org-1");
+  await auth.cancelOrganizationInvitation("invite-1");
+
+  assert.deepEqual(
+    calls.slice(2).map(({ path, init }) => [path, init.method, JSON.parse(init.body)]),
+    [
+      ["/organization/invite-member", "POST", {
+        email: "new@example.test",
+        role: "member",
+        organizationId: "org-1",
+        resend: true,
+      }],
+      ["/organization/update-member-role", "POST", {
+        memberId: "member-1",
+        role: "admin",
+        organizationId: "org-1",
+      }],
+      ["/organization/remove-member", "POST", {
+        memberIdOrEmail: "member-1",
+        organizationId: "org-1",
+      }],
+      ["/organization/cancel-invitation", "POST", { invitationId: "invite-1" }],
+    ],
+  );
+  assert.ok(calls.every(({ init }) => init.credentials === "include"));
+});
+
 test("token provider delegates to the Neon token API without persistence", async () => {
   let tokenCalls = 0;
   const token = await tokenFromClient({

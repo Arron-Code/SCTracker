@@ -1,12 +1,12 @@
-import { createApiClient, ApiError } from "./src/api.mjs?v=5";
-import { createManagedAuth, AuthError } from "./src/auth.mjs?v=6";
-import { calculateCompletion, validateMassBalance } from "./src/domain.mjs?v=1";
-import { parseGeoJson } from "./src/geojson.mjs?v=2";
+import { createApiClient, ApiError } from "./src/api.mjs?v=6";
+import { createManagedAuth, AuthError } from "./src/auth.mjs?v=7";
+import { calculateCompletion, validateMassBalance } from "./src/domain.mjs?v=2";
+import { parseGeoJson } from "./src/geojson.mjs?v=3";
 import {
   SUPPORTED_LANGUAGES,
   applyTranslations,
   translate,
-} from "./src/i18n.mjs?v=6";
+} from "./src/i18n.mjs?v=7";
 
 const auth = createManagedAuth();
 const api = createApiClient({
@@ -39,6 +39,10 @@ const state = {
     shipments: null,
   },
   administration: {
+    organizations: [],
+    members: [],
+    invitations: [],
+    managedOrganizationId: null,
     users: [],
     devices: [],
     keys: [],
@@ -77,7 +81,6 @@ const authProviders = document.querySelector("#auth-providers");
 const authProviderButtons = document.querySelector("#auth-provider-buttons");
 const authResetRequest = document.querySelector("#auth-reset-request");
 const authResetPassword = document.querySelector("#auth-reset-password");
-const organizationForm = document.querySelector("#organization-form");
 const organizationSelect = document.querySelector("#organization-select");
 const organizationSelectButton = document.querySelector("#organization-select-button");
 const signOutButton = document.querySelector("#sign-out-button");
@@ -86,7 +89,13 @@ const administrationDevices = document.querySelector("#administration-devices");
 const administrationKeys = document.querySelector("#administration-keys");
 const administrationError = document.querySelector("#administration-error");
 const administrationRefresh = document.querySelector("#administration-refresh");
-const administrationAddUser = document.querySelector("#administration-add-user");
+const administrationOrganizationSelect = document.querySelector("#administration-organization-select");
+const administrationOrganizationForm = document.querySelector("#administration-organization-form");
+const administrationMemberInviteForm = document.querySelector("#administration-member-invite-form");
+const administrationMembers = document.querySelector("#administration-members");
+const administrationInvitations = document.querySelector("#administration-invitations");
+const administrationOrganizationCount = document.querySelector("#administration-organization-count");
+const administrationMemberCount = document.querySelector("#administration-member-count");
 const administrationUserSearch = document.querySelector("#administration-user-search");
 const administrationUserStatusFilter = document.querySelector("#administration-user-status-filter");
 const administrationDeviceSearch = document.querySelector("#administration-device-search");
@@ -355,12 +364,76 @@ function administrationDeviceActions(device) {
     </div>`;
 }
 
+function organizationRoleOptions(selectedRole) {
+  return ["member", "admin"].map((role) => `
+    <option value="${role}" ${selectedRole === role ? "selected" : ""}>
+      ${escapeHtml(t(role === "admin" ? "administration.roleOrganizationAdmin" : "administration.roleMember"))}
+    </option>`).join("");
+}
+
+function renderOrganizationAdministration() {
+  const { organizations, members, invitations, managedOrganizationId } = state.administration;
+  administrationOrganizationCount.textContent = String(organizations.length);
+  administrationMemberCount.textContent = t("administration.memberCount")
+    .replace("{count}", String(members.length));
+  administrationOrganizationSelect.innerHTML = organizations.length
+    ? organizations.map((organization) => `
+      <option value="${escapeHtml(organization.id)}" ${organization.id === managedOrganizationId ? "selected" : ""}>
+        ${escapeHtml(organization.name)} · ${escapeHtml(organization.slug)}
+      </option>`).join("")
+    : `<option value="">${escapeHtml(t("administration.noOrganizations"))}</option>`;
+  administrationOrganizationSelect.disabled = organizations.length === 0;
+  administrationMemberInviteForm.querySelector("button").disabled = !managedOrganizationId;
+
+  administrationMembers.innerHTML = members.length === 0
+    ? `<tr><td colspan="4"><div class="resource-state">${escapeHtml(t("administration.emptyMembers"))}</div></td></tr>`
+    : members.map((member) => {
+      const isCurrentUser = member.userId === authState.session?.user?.id;
+      const protectedMember = member.role === "owner" || isCurrentUser;
+      return `
+        <tr>
+          <td>
+            <div class="administration-identity">
+              <strong>${escapeHtml(member.user?.name ?? member.user?.email ?? member.userId)}</strong>
+              <small>${escapeHtml(member.user?.email ?? member.userId)}</small>
+            </div>
+          </td>
+          <td>
+            ${member.role === "owner"
+              ? statusBadge(t("administration.roleOwner"))
+              : `<select data-member-role="${escapeHtml(member.id)}">${organizationRoleOptions(member.role)}</select>`}
+          </td>
+          <td>${escapeHtml(formatAdministrationDate(member.createdAt))}</td>
+          <td>
+            <div class="administration-actions">
+              ${member.role === "owner" ? "" : `<button class="text-button" type="button" data-save-member-role="${escapeHtml(member.id)}">${escapeHtml(t("common.save"))}</button>`}
+              <button class="text-button danger" type="button" data-remove-member="${escapeHtml(member.id)}" ${protectedMember ? "disabled" : ""}>${escapeHtml(t("administration.removeMember"))}</button>
+            </div>
+          </td>
+        </tr>`;
+    }).join("");
+
+  const visibleInvitations = invitations.filter(
+    (invitation) => !managedOrganizationId || invitation.organizationId === managedOrganizationId,
+  );
+  administrationInvitations.innerHTML = visibleInvitations.length === 0
+    ? `<tr><td colspan="4"><div class="resource-state">${escapeHtml(t("administration.emptyInvitations"))}</div></td></tr>`
+    : visibleInvitations.map((invitation) => `
+      <tr>
+        <td>${escapeHtml(invitation.email)}</td>
+        <td>${escapeHtml(invitation.role)}</td>
+        <td>${statusBadge(invitation.status)}</td>
+        <td><button class="text-button danger" type="button" data-cancel-invitation="${escapeHtml(invitation.id)}">${escapeHtml(t("administration.cancelInvitation"))}</button></td>
+      </tr>`).join("");
+}
+
 function renderAdministration() {
   administrationError.hidden = !state.administration.error;
   administrationError.textContent = state.administration.error
     ? errorMessage(state.administration.error)
     : "";
   const { users, devices, keys } = state.administration;
+  renderOrganizationAdministration();
   const trustedStates = new Set(["LOCALLY_TRUSTED", "ORGANIZATION_VERIFIED"]);
   administrationUserCount.textContent = String(users.length);
   administrationActiveUserCount.textContent = t("administration.activeCount")
@@ -497,22 +570,48 @@ async function showDeviceDetails(deviceId) {
 
 async function loadAdministration() {
   administrationError.hidden = true;
-  administrationUsers.innerHTML = `<tr><td colspan="5"><div class="resource-state loading">${escapeHtml(t("common.loading"))}</div></td></tr>`;
+  const loadingRow = `<tr><td colspan="5"><div class="resource-state loading">${escapeHtml(t("common.loading"))}</div></td></tr>`;
+  administrationUsers.innerHTML = loadingRow;
   administrationDevices.innerHTML = administrationUsers.innerHTML;
   administrationKeys.innerHTML = administrationUsers.innerHTML;
+  administrationMembers.innerHTML = loadingRow;
+  administrationInvitations.innerHTML = loadingRow;
+  state.administration.organizations = [...authState.organizations];
+  const availableOrganizationIds = new Set(authState.organizations.map((organization) => organization.id));
+  if (!availableOrganizationIds.has(state.administration.managedOrganizationId)) {
+    state.administration.managedOrganizationId =
+      authState.session?.session?.activeOrganizationId
+      ?? authState.organizations[0]?.id
+      ?? null;
+  }
+  const organizationId = state.administration.managedOrganizationId;
   const results = await Promise.allSettled([
     api.administration.users(),
     api.administration.devices(),
     api.administration.keys(),
+    organizationId
+      ? auth.listOrganizationMembers(organizationId)
+      : Promise.resolve({ members: [], total: 0 }),
+    organizationId
+      ? auth.listOrganizationInvitations()
+      : Promise.resolve([]),
   ]);
-  const keys = ["users", "devices", "keys"];
   const rejected = results.find((result) => result.status === "rejected");
-  results.forEach((result, index) => {
-    state.administration[keys[index]] =
-      result.status === "fulfilled" && Array.isArray(result.value.data)
-        ? result.value.data
-        : [];
-  });
+  state.administration.users = results[0].status === "fulfilled" && Array.isArray(results[0].value.data)
+    ? results[0].value.data
+    : [];
+  state.administration.devices = results[1].status === "fulfilled" && Array.isArray(results[1].value.data)
+    ? results[1].value.data
+    : [];
+  state.administration.keys = results[2].status === "fulfilled" && Array.isArray(results[2].value.data)
+    ? results[2].value.data
+    : [];
+  state.administration.members = results[3].status === "fulfilled"
+    ? results[3].value.members
+    : [];
+  state.administration.invitations = results[4].status === "fulfilled"
+    ? results[4].value
+    : [];
   state.administration.error = rejected?.reason ?? null;
   renderAdministration();
 }
@@ -529,6 +628,10 @@ function clearResources() {
   renderShipments();
   state.administration = {
     ...state.administration,
+    organizations: [],
+    members: [],
+    invitations: [],
+    managedOrganizationId: null,
     users: [],
     devices: [],
     keys: [],
@@ -1002,7 +1105,67 @@ document.querySelectorAll("[data-dialog]").forEach((button) =>
   button.addEventListener("click", () => openDialog(button.dataset.dialog)),
 );
 administrationRefresh.addEventListener("click", () => void loadAdministration());
-administrationAddUser.addEventListener("click", () => openDialog("adminUser"));
+administrationOrganizationSelect.addEventListener("change", () => {
+  const organizationId = administrationOrganizationSelect.value;
+  if (!organizationId) return;
+  administrationOrganizationSelect.disabled = true;
+  void auth.setActiveOrganization(organizationId).then(async () => {
+    state.administration.managedOrganizationId = organizationId;
+    await refreshAuth();
+    await loadAdministration();
+  }).catch((error) => {
+    state.administration.error = error;
+    renderAdministration();
+  }).finally(() => {
+    administrationOrganizationSelect.disabled = false;
+  });
+});
+administrationOrganizationForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const form = new FormData(administrationOrganizationForm);
+  const submit = administrationOrganizationForm.querySelector("button");
+  submit.disabled = true;
+  void auth.createOrganization(
+    form.get("name").trim(),
+    form.get("slug").trim(),
+  ).then(async (organization) => {
+    administrationOrganizationForm.reset();
+    if (organization?.id) {
+      state.administration.managedOrganizationId = organization.id;
+      await auth.setActiveOrganization(organization.id);
+    }
+    await refreshAuth();
+    await loadAdministration();
+    showToast(t("success.organizationCreated"));
+  }).catch((error) => {
+    state.administration.error = error;
+    renderAdministration();
+  }).finally(() => {
+    submit.disabled = false;
+  });
+});
+administrationMemberInviteForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const organizationId = state.administration.managedOrganizationId;
+  if (!organizationId) return;
+  const form = new FormData(administrationMemberInviteForm);
+  const submit = administrationMemberInviteForm.querySelector("button");
+  submit.disabled = true;
+  void auth.inviteOrganizationMember(
+    form.get("email").trim(),
+    form.get("role"),
+    organizationId,
+  ).then(async () => {
+    administrationMemberInviteForm.reset();
+    await loadAdministration();
+    showToast(t("success.organizationInvitation"));
+  }).catch((error) => {
+    state.administration.error = error;
+    renderAdministration();
+  }).finally(() => {
+    submit.disabled = false;
+  });
+});
 administrationUserSearch.addEventListener("input", () => {
   state.administration.userSearch = administrationUserSearch.value.trim();
   renderAdministration();
@@ -1044,6 +1207,59 @@ async function revokeAdministrationKey(keyId, button) {
 }
 
 document.querySelector("#administration").addEventListener("click", (event) => {
+  const saveMemberRoleButton = event.target.closest("[data-save-member-role]");
+  if (saveMemberRoleButton) {
+    const organizationId = state.administration.managedOrganizationId;
+    const memberId = saveMemberRoleButton.dataset.saveMemberRole;
+    const role = administrationMembers.querySelector(`[data-member-role="${CSS.escape(memberId)}"]`)?.value;
+    if (!organizationId || !role) return;
+    saveMemberRoleButton.disabled = true;
+    void auth.updateOrganizationMemberRole(memberId, role, organizationId).then(async () => {
+      await loadAdministration();
+      showToast(t("success.organizationRole"));
+    }).catch((error) => {
+      state.administration.error = error;
+      renderAdministration();
+    }).finally(() => {
+      saveMemberRoleButton.disabled = false;
+    });
+    return;
+  }
+  const removeMemberButton = event.target.closest("[data-remove-member]");
+  if (removeMemberButton) {
+    const organizationId = state.administration.managedOrganizationId;
+    if (!organizationId || !window.confirm(t("administration.removeMemberConfirm"))) return;
+    removeMemberButton.disabled = true;
+    void auth.removeOrganizationMember(
+      removeMemberButton.dataset.removeMember,
+      organizationId,
+    ).then(async () => {
+      await loadAdministration();
+      showToast(t("success.organizationMemberRemoved"));
+    }).catch((error) => {
+      state.administration.error = error;
+      renderAdministration();
+    }).finally(() => {
+      removeMemberButton.disabled = false;
+    });
+    return;
+  }
+  const cancelInvitationButton = event.target.closest("[data-cancel-invitation]");
+  if (cancelInvitationButton) {
+    cancelInvitationButton.disabled = true;
+    void auth.cancelOrganizationInvitation(
+      cancelInvitationButton.dataset.cancelInvitation,
+    ).then(async () => {
+      await loadAdministration();
+      showToast(t("success.organizationInvitationCanceled"));
+    }).catch((error) => {
+      state.administration.error = error;
+      renderAdministration();
+    }).finally(() => {
+      cancelInvitationButton.disabled = false;
+    });
+    return;
+  }
   const editUserButton = event.target.closest("[data-edit-user]");
   if (editUserButton) {
     openDialog("adminUser", editUserButton.dataset.editUser);
@@ -1205,14 +1421,6 @@ authResetPassword.addEventListener("submit", (event) => {
     history.replaceState(null, "", `${location.pathname}${location.hash}`);
     showToast(t("auth.passwordResetComplete"));
   });
-});
-organizationForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const form = new FormData(organizationForm);
-  void runAuthAction(() => auth.createOrganization(
-    form.get("name").trim(),
-    form.get("slug").trim(),
-  ));
 });
 organizationSelect.addEventListener("change", () => {
   organizationSelectButton.disabled = !organizationSelect.value;
