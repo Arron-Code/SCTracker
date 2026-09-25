@@ -2,6 +2,9 @@
 
 Expo/React-Native-App für Android und iOS mit vollständiger Oberfläche in Deutsch, Englisch, Amharisch und Tigrinya. Die Sprachauswahl bleibt dauerhaft im Header verfügbar und wird lokal gespeichert.
 
+Die deutschsprachige Bedienungsanleitung für die aktuelle iOS-App steht unter
+[`../docs/mobile-ios-gebrauchsanweisung-de.md`](../docs/mobile-ios-gebrauchsanweisung-de.md).
+
 ## Funktionen
 
 - Offline-fähige Lieferanten- und Kaffee-Plot-Erfassung
