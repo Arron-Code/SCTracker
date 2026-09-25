@@ -1,11 +1,10 @@
 import { expoClient } from "@better-auth/expo/client";
 import { createAuthClient } from "better-auth/react";
-import { emailOTPClient, jwtClient, organizationClient } from "better-auth/client/plugins";
+import { emailOTPClient } from "better-auth/client/plugins";
 import * as SecureStore from "expo-secure-store";
 import {
   AuthError,
   getNeonAuthUrl,
-  tokenFromClient,
   type AuthOrganization,
   type AuthSession,
 } from "./auth-core";
@@ -24,9 +23,7 @@ const client = baseURL
         },
       },
       plugins: [
-        jwtClient(),
         emailOTPClient(),
-        organizationClient(),
         expoClient({
           scheme: "sctracker",
           storagePrefix: "sctracker.auth",
@@ -58,11 +55,12 @@ function unwrap<T>(
 
 export const authConfigured = client !== null;
 
-function authenticatedFetchOptions() {
+function getSessionToken() {
   const sessionToken = SecureStore.getItem(AUTH_SESSION_TOKEN_STORAGE_KEY);
-  return sessionToken
-    ? { headers: { Authorization: `Bearer ${sessionToken}` } }
-    : {};
+  if (!sessionToken) {
+    throw new AuthError("AUTH_REQUIRED", "Sign in again to continue.");
+  }
+  return sessionToken;
 }
 
 async function authRequest<T>(request: Promise<T>, timeoutMessage: string): Promise<T> {
@@ -82,24 +80,58 @@ async function authRequest<T>(request: Promise<T>, timeoutMessage: string): Prom
   }
 }
 
+async function authenticatedAuthRequest<T>(
+  path: string,
+  fallbackMessage: string,
+  init: RequestInit = {},
+): Promise<T> {
+  if (!baseURL) {
+    throw new AuthError(
+      "AUTH_NOT_CONFIGURED",
+      "EXPO_PUBLIC_NEON_AUTH_URL is not configured.",
+    );
+  }
+
+  return authRequest(
+    (async () => {
+      const headers = new Headers(init.headers);
+      headers.set("Accept", "application/json");
+      headers.set("Authorization", `Bearer ${getSessionToken()}`);
+      headers.set("Origin", MOBILE_AUTH_ORIGIN);
+      if (init.body) headers.set("Content-Type", "application/json");
+
+      const response = await fetch(`${baseURL}${path}`, {
+        ...init,
+        headers,
+      });
+      const payload = response.headers.get("content-type")?.includes("application/json")
+        ? await response.json()
+        : null;
+      if (!response.ok) {
+        throw new AuthError(
+          payload?.code ?? payload?.error?.code ?? `AUTH_HTTP_${response.status}`,
+          payload?.message ?? payload?.error?.message ?? `${fallbackMessage} (${response.status}).`,
+        );
+      }
+      return payload as T;
+    })(),
+    `${fallbackMessage} Please try again.`,
+  );
+}
+
 export async function getAccessToken(): Promise<string | null> {
-  return tokenFromClient({
-    token: () => requireClient().token({
-      fetchOptions: authenticatedFetchOptions(),
-    }),
-  });
+  const result = await authenticatedAuthRequest<{ token?: string | null }>(
+    "/token",
+    "Could not obtain an access token.",
+  );
+  return result?.token ?? null;
 }
 
 export async function getSession(): Promise<AuthSession | null> {
-  return unwrap(
-    await authRequest(
-      requireClient().getSession({
-        fetchOptions: authenticatedFetchOptions(),
-      }),
-      "The session request timed out. Please try again.",
-    ),
+  return authenticatedAuthRequest<AuthSession | null>(
+    "/get-session",
     "Could not load the session.",
-  ) as AuthSession | null;
+  );
 }
 
 export async function signIn(email: string, password: string) {
@@ -163,40 +195,33 @@ export async function verifyEmailOtp(email: string, otp: string) {
 }
 
 export async function signOut() {
-  const result = unwrap(
-    await authRequest(
-      requireClient().signOut({
-        fetchOptions: authenticatedFetchOptions(),
-      }),
-      "Sign-out timed out. Please try again.",
-    ),
+  const result = await authenticatedAuthRequest<unknown>(
+    "/sign-out",
     "Sign-out failed.",
+    { method: "POST" },
   );
   await SecureStore.deleteItemAsync(AUTH_SESSION_TOKEN_STORAGE_KEY);
   return result;
 }
 
 export async function listOrganizations(): Promise<AuthOrganization[]> {
-  return (unwrap(
-    await authRequest(
-      requireClient().organization.list({
-        fetchOptions: authenticatedFetchOptions(),
-      }),
-      "Loading organizations timed out. Please try again.",
-    ),
+  const organizations = await authenticatedAuthRequest<unknown>(
+    "/organization/list",
     "Could not load organizations.",
-  ) ?? []) as AuthOrganization[];
+  );
+  if (!Array.isArray(organizations)) {
+    throw new AuthError("INVALID_AUTH_RESPONSE", "Could not load organizations.");
+  }
+  return organizations as AuthOrganization[];
 }
 
 export async function setActiveOrganization(organizationId: string) {
-  return unwrap(
-    await authRequest(
-      requireClient().organization.setActive({
-        organizationId,
-        fetchOptions: authenticatedFetchOptions(),
-      }),
-      "Selecting the organization timed out. Please try again.",
-    ),
+  return authenticatedAuthRequest<AuthOrganization>(
+    "/organization/set-active",
     "Could not select the organization.",
+    {
+      method: "POST",
+      body: JSON.stringify({ organizationId }),
+    },
   );
 }

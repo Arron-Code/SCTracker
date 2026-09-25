@@ -44,8 +44,7 @@ test("mobile auth sends a trusted HTTPS Origin without redirecting email sign-in
     source,
     /SecureStore\.setItemAsync\(AUTH_SESSION_TOKEN_STORAGE_KEY, result\.token\)/,
   );
-  assert.match(source, /SecureStore\.deleteItemAsync\(EXPO_COOKIE_STORAGE_KEY\)/);
-  assert.match(source, /Authorization: `Bearer \$\{sessionToken\}`/);
+  assert.match(source, /headers\.set\("Authorization", `Bearer \$\{getSessionToken\(\)\}`\)/);
 });
 
 test("mobile auth exposes Neon email verification OTP operations", async () => {
@@ -56,11 +55,12 @@ test("mobile auth exposes Neon email verification OTP operations", async () => {
   assert.match(source, /emailOtp\.verifyEmail\(\{ email, otp \}\)/);
 });
 
-test("mobile organization management only selects centrally assigned organizations", async () => {
+test("mobile organization management uses explicit bearer requests for centrally assigned organizations", async () => {
   const source = await readFile(new URL("./auth.ts", import.meta.url), "utf8");
-  assert.match(source, /organization\.list\(\{/);
-  assert.match(source, /organization\.setActive\(\{/);
-  assert.doesNotMatch(source, /organization\.create\(\{/);
+  assert.match(source, /authenticatedAuthRequest<unknown>\(\s*"\/organization\/list"/);
+  assert.match(source, /authenticatedAuthRequest<AuthOrganization>\(\s*"\/organization\/set-active"/);
+  assert.match(source, /body: JSON\.stringify\(\{ organizationId \}\)/);
+  assert.doesNotMatch(source, /"\/organization\/create"/);
 });
 
 test("mobile token provider calls token() for each request and surfaces errors", async () => {
