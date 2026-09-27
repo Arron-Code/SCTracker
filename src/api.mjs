@@ -211,6 +211,9 @@ export function createApiClient(options = {}) {
       createUser: (input) => json("POST", "/admin/users", input),
       saveUser: (actorId, input) =>
         json("PUT", `/admin/identity/users/${encodeURIComponent(actorId)}`, input),
+      authOrganizations: () => request("/admin/auth-organizations"),
+      saveAuthOrganizationAssignments: (email, organizationIds) =>
+        json("PUT", "/admin/auth-organizations/assignments", { email, organizationIds }),
       devices: () => request("/admin/devices"),
       deviceAttestations: (deviceId) =>
         request(`/admin/devices/${encodeURIComponent(deviceId)}/attestations`),

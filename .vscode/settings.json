@@ -1,0 +1,7 @@
+{
+    "mdk.platform": "Android",
+    "mdk.defaultEditor": "MDK Editor",
+    "workbench.editorAssociations": {},
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "notebook.defaultFormatter": "esbenp.prettier-vscode"
+}

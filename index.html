@@ -9,7 +9,7 @@
       data-i18n-content="meta.description"
     />
     <title>SCTracker | Coffee Evidence</title>
-    <link rel="stylesheet" href="styles.css?v=6" />
+    <link rel="stylesheet" href="styles.css?v=7" />
   </head>
   <body>
     <div class="app-shell" id="app-shell" hidden>
@@ -41,11 +41,14 @@
           <a class="nav-link" href="#dds" data-view="dds">
             <span>06</span><span data-i18n="nav.dds">DDS</span>
           </a>
-          <a class="nav-link" href="#administration" data-view="administration">
-            <span>07</span><span data-i18n="nav.administration">Benutzer & Geräte</span>
-          </a>
           <a class="nav-link" href="#guide" data-view="guide">
-            <span>08</span><span data-i18n="nav.guide">Anleitung</span>
+            <span>07</span><span data-i18n="nav.guide">Anleitung</span>
+          </a>
+          <a class="nav-link admin-nav-link" href="#organization-administration" data-view="organization-administration" hidden>
+            <span>A1</span><span data-i18n="nav.organizationAdministration">Organisationen</span>
+          </a>
+          <a class="nav-link admin-nav-link" href="#administration" data-view="administration" hidden>
+            <span>A2</span><span data-i18n="nav.administration">Benutzer & Geräte</span>
           </a>
         </nav>
 
@@ -65,6 +68,9 @@
             <h1 id="page-title">Compliance Cockpit</h1>
           </div>
           <div class="topbar-actions">
+            <button class="secondary-button workspace-mode-toggle" id="workspace-mode-toggle" type="button" hidden>
+              <span data-i18n="administration.openAdmin">Administration</span>
+            </button>
             <div class="language-selector" role="group" aria-label="Sprache auswählen" data-i18n-aria-label="aria.language">
               <button type="button" data-language="de" aria-pressed="true">DE</button>
               <button type="button" data-language="en" aria-pressed="false">EN</button>
@@ -341,14 +347,14 @@
           </div>
         </section>
 
-        <section class="view" id="administration" data-title-key="title.administration">
+        <section class="view" id="organization-administration" data-title-key="title.organizationAdministration">
           <div class="section-intro administration-intro">
             <div>
-              <p class="eyebrow" data-i18n="administration.eyebrow">VERTRAUENSVERWALTUNG</p>
-              <h2 data-i18n="administration.title">Benutzer, Geräte und Schlüssel</h2>
-              <p data-i18n="administration.description">Organisationsbezogene Verwaltung von Zugriff, Gerätevertrauen, Attestierung und Signaturschlüsseln.</p>
+              <p class="eyebrow" data-i18n="administration.organizationsEyebrow">NEON AUTH</p>
+              <h2 data-i18n="administration.organizationAdministration">Organisationen und Mitgliedschaften</h2>
+              <p data-i18n="administration.organizationDescription">Login-Organisationen zentral auswählen, erstellen und Benutzer per E-Mail verbinden.</p>
             </div>
-            <button class="secondary-button" id="administration-refresh" type="button" data-i18n="common.refresh">Aktualisieren</button>
+            <button class="secondary-button administration-refresh" type="button" data-i18n="common.refresh">Aktualisieren</button>
           </div>
           <div class="resource-state error" id="administration-error" role="alert" hidden></div>
           <section class="administration-zone administration-organizations-zone" aria-labelledby="administration-organizations-title">
@@ -395,6 +401,7 @@
                   </label>
                   <button class="primary-button" type="submit" data-i18n="administration.sendInvitation">Einladung senden</button>
                 </form>
+                <div class="invitation-delivery-status" id="administration-invitation-status" role="status" aria-live="polite"></div>
               </article>
             </div>
             <article class="panel table-panel administration-table-card">
@@ -430,12 +437,26 @@
               </div>
             </article>
           </section>
-          <div class="administration-summary" aria-label="Verwaltungsübersicht" data-i18n-aria-label="administration.summary">
+          <div class="administration-summary organization-summary" aria-label="Verwaltungsübersicht" data-i18n-aria-label="administration.summary">
             <article class="administration-stat organization-stat">
               <span data-i18n="administration.totalOrganizations">Organisationen</span>
               <strong id="administration-organization-count">0</strong>
               <small id="administration-member-count">0 Mitglieder</small>
             </article>
+          </div>
+        </section>
+
+        <section class="view" id="administration" data-title-key="title.administration">
+          <div class="section-intro administration-intro">
+            <div>
+              <p class="eyebrow" data-i18n="administration.eyebrow">VERTRAUENSVERWALTUNG</p>
+              <h2 data-i18n="administration.title">Benutzer, Geräte und Schlüssel</h2>
+              <p data-i18n="administration.description">Organisationsbezogene Verwaltung von Zugriff, Gerätevertrauen, Attestierung und Signaturschlüsseln.</p>
+            </div>
+            <button class="secondary-button administration-refresh" type="button" data-i18n="common.refresh">Aktualisieren</button>
+          </div>
+          <div class="resource-state error" id="identity-administration-error" role="alert" hidden></div>
+          <div class="administration-summary" aria-label="Verwaltungsübersicht" data-i18n-aria-label="administration.summary">
             <article class="administration-stat user-stat">
               <span data-i18n="administration.totalUsers">Benutzer gesamt</span>
               <strong id="administration-user-count">0</strong>
@@ -460,6 +481,7 @@
                 <h3 id="administration-users-title" data-i18n="administration.userAdministration">Benutzeradministration</h3>
                 <p data-i18n="administration.userDescription">Identitäten, Rollen, Zugriffsstatus und organisatorisches Vertrauen zentral steuern.</p>
               </div>
+              <button class="primary-button administration-add-user" type="button" data-dialog="adminUser" data-i18n="administration.addUser">Benutzer hinzufügen</button>
             </div>
             <div class="administration-toolbar">
               <label class="administration-search">
@@ -482,6 +504,7 @@
                     <tr>
                       <th data-i18n="administration.identity">Identität</th>
                       <th data-i18n="administration.roles">Rollen</th>
+                      <th data-i18n="administration.organizationAssignments">Organisationen</th>
                       <th data-i18n="administration.status">Status</th>
                       <th data-i18n="administration.lastSeen">Letzte Anmeldung</th>
                       <th data-i18n="administration.actions">Aktionen</th>
@@ -748,6 +771,6 @@
         SC_TRACKER_AUTH_PROVIDERS: ["google"],
       };
     </script>
-    <script type="module" src="app.js?v=14"></script>
+    <script type="module" src="app.js?v=15"></script>
   </body>
 </html>

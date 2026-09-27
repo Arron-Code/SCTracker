@@ -155,6 +155,10 @@ const organizationUserInput = z.object({
   roles: actorRoles.optional(),
   status: z.enum(["active", "suspended"]).optional(),
 });
+const authOrganizationAssignmentsInput = z.object({
+  email: z.string().email(),
+  organizationIds: z.array(uuid),
+});
 const deviceRegistrationInput = z.object({
   deviceId: uuid,
   displayName: name,
@@ -736,6 +740,32 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     await syncActorIdentity(request);
     requireOrganizationAdminActor(request);
     return data(await listUsersWithTrust(request.actor.tenantId));
+  });
+  app.get("/api/v1/admin/auth-organizations", { schema: { tags: ["identity"] } }, async (request) => {
+    requireOrganizationAdminActor(request);
+    if (!request.actor.subjectId) {
+      throw new AppError("AUTH_REQUIRED", "A managed authentication subject is required", 401);
+    }
+    return data(await options.repository.getAuthOrganizationAdministration(request.actor.subjectId));
+  });
+  app.put("/api/v1/admin/auth-organizations/assignments", { schema: { tags: ["identity"] } }, async (request) => {
+    requireOrganizationAdminActor(request);
+    if (!request.actor.subjectId) {
+      throw new AppError("AUTH_REQUIRED", "A managed authentication subject is required", 401);
+    }
+    const payload = authOrganizationAssignmentsInput.parse(request.body);
+    const assignment = await options.repository.setAuthOrganizationAssignments(
+      request.actor.subjectId,
+      payload.email,
+      payload.organizationIds,
+    );
+    await options.repository.appendAudit(
+      request.actor.tenantId,
+      request.actor.actorId,
+      "identity.user.organizations_updated",
+      assignment,
+    );
+    return data(assignment);
   });
   app.post("/api/v1/admin/users", { schema: { tags: ["identity"] } }, createOrganizationUser);
   app.put("/api/v1/admin/identity/users/:actorId", { schema: { tags: ["identity"] } }, saveOrganizationUser);

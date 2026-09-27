@@ -171,6 +171,15 @@ export function createManagedAuth(options = {}) {
       await requireClient().organization.setActive({ organizationId }),
       "Could not select the organization.",
     ),
+    getActiveOrganizationRole: async () => {
+      requireClient();
+      const result = await requestAuthJson(
+        fetchImpl,
+        `${baseUrl}/organization/get-active-member-role`,
+        "Could not load the active organization role",
+      );
+      return typeof result?.role === "string" ? result.role : null;
+    },
     listOrganizationMembers: async (organizationId) => {
       requireClient();
       const query = new URLSearchParams({

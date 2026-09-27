@@ -1364,6 +1364,31 @@ tr:last-child td {
   margin: 18px 0;
 }
 
+.organization-summary {
+  grid-template-columns: minmax(240px, 360px);
+}
+
+.workspace-mode-toggle {
+  white-space: nowrap;
+}
+
+.invitation-delivery-status {
+  min-height: 1.25rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.invitation-delivery-status:empty {
+  display: none;
+}
+
+.administration-role.organization-role {
+  border-color: rgba(107, 76, 149, 0.2);
+  color: #5d3f86;
+  background: #f1ebf8;
+}
+
 .administration-stat {
   display: grid;
   gap: 4px;

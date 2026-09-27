@@ -63,6 +63,17 @@ test("mobile organization management uses explicit bearer requests for centrally
   assert.doesNotMatch(source, /"\/organization\/create"/);
 });
 
+test("mobile app automatically activates the first assigned organization", async () => {
+  const source = await readFile(new URL("../App.tsx", import.meta.url), "utf8");
+  assert.match(
+    source,
+    /if \(!nextSession\.session\.activeOrganizationId && nextOrganizations\.length > 0\)/,
+  );
+  assert.match(source, /await setActiveOrganization\(organizationId\)/);
+  assert.match(source, /activeOrganizationId: organizationId/);
+  assert.match(source, /AppState\.addEventListener\("change"/);
+});
+
 test("mobile token provider calls token() for each request and surfaces errors", async () => {
   let calls = 0;
   const client = {

@@ -145,6 +145,7 @@ test("organization administration uses Neon Auth membership endpoints", async ()
       total: 1,
     }],
     ["/organization/list-invitations", [{ id: "invite-1", email: "new@example.test" }]],
+    ["/organization/get-active-member-role", { role: "admin" }],
   ]);
   const auth = createManagedAuth({
     config: { SC_TRACKER_NEON_AUTH_URL: "https://auth.example.test/auth" },
@@ -167,13 +168,14 @@ test("organization administration uses Neon Auth membership endpoints", async ()
   assert.deepEqual(await auth.listOrganizationInvitations(), [
     { id: "invite-1", email: "new@example.test" },
   ]);
+  assert.equal(await auth.getActiveOrganizationRole(), "admin");
   await auth.inviteOrganizationMember("new@example.test", "member", "org-1");
   await auth.updateOrganizationMemberRole("member-1", "admin", "org-1");
   await auth.removeOrganizationMember("member-1", "org-1");
   await auth.cancelOrganizationInvitation("invite-1");
 
   assert.deepEqual(
-    calls.slice(2).map(({ path, init }) => [path, init.method, JSON.parse(init.body)]),
+    calls.slice(3).map(({ path, init }) => [path, init.method, JSON.parse(init.body)]),
     [
       ["/organization/invite-member", "POST", {
         email: "new@example.test",

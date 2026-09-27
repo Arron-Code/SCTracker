@@ -1,12 +1,12 @@
-import { createApiClient, ApiError } from "./src/api.mjs?v=6";
-import { createManagedAuth, AuthError } from "./src/auth.mjs?v=7";
+import { createApiClient, ApiError } from "./src/api.mjs?v=7";
+import { createManagedAuth, AuthError } from "./src/auth.mjs?v=8";
 import { calculateCompletion, validateMassBalance } from "./src/domain.mjs?v=2";
 import { parseGeoJson } from "./src/geojson.mjs?v=3";
 import {
   SUPPORTED_LANGUAGES,
   applyTranslations,
   translate,
-} from "./src/i18n.mjs?v=7";
+} from "./src/i18n.mjs?v=8";
 
 const auth = createManagedAuth();
 const api = createApiClient({
@@ -40,8 +40,11 @@ const state = {
   },
   administration: {
     organizations: [],
+    manageableOrganizations: [],
+    organizationAssignments: [],
     members: [],
     invitations: [],
+    invitationStatus: null,
     managedOrganizationId: null,
     users: [],
     devices: [],
@@ -84,16 +87,20 @@ const authResetPassword = document.querySelector("#auth-reset-password");
 const organizationSelect = document.querySelector("#organization-select");
 const organizationSelectButton = document.querySelector("#organization-select-button");
 const signOutButton = document.querySelector("#sign-out-button");
+const workspaceModeToggle = document.querySelector("#workspace-mode-toggle");
+const adminNavLinks = [...document.querySelectorAll(".admin-nav-link")];
 const administrationUsers = document.querySelector("#administration-users");
 const administrationDevices = document.querySelector("#administration-devices");
 const administrationKeys = document.querySelector("#administration-keys");
 const administrationError = document.querySelector("#administration-error");
-const administrationRefresh = document.querySelector("#administration-refresh");
+const identityAdministrationError = document.querySelector("#identity-administration-error");
+const administrationRefreshButtons = [...document.querySelectorAll(".administration-refresh")];
 const administrationOrganizationSelect = document.querySelector("#administration-organization-select");
 const administrationOrganizationForm = document.querySelector("#administration-organization-form");
 const administrationMemberInviteForm = document.querySelector("#administration-member-invite-form");
 const administrationMembers = document.querySelector("#administration-members");
 const administrationInvitations = document.querySelector("#administration-invitations");
+const administrationInvitationStatus = document.querySelector("#administration-invitation-status");
 const administrationOrganizationCount = document.querySelector("#administration-organization-count");
 const administrationMemberCount = document.querySelector("#administration-member-count");
 const administrationUserSearch = document.querySelector("#administration-user-search");
@@ -114,10 +121,12 @@ let activeLanguage = getInitialLanguage();
 let toastTimer;
 let resetToken = new URLSearchParams(location.search).get("token");
 let authAction = resetToken ? "resetPassword" : "signIn";
+let workspaceMode = "front";
 const authState = {
   loading: auth.configured,
   session: null,
   organizations: [],
+  organizationRole: null,
   error: null,
 };
 
@@ -188,12 +197,41 @@ function errorMessage(error) {
 }
 
 function showView(viewId) {
-  const selected = views.find((view) => view.id === viewId) ?? views[0];
+  const adminView = ["organization-administration", "administration"].includes(viewId);
+  const resolvedViewId = adminView && !["admin", "owner"].includes(authState.organizationRole)
+    ? "overview"
+    : viewId;
+  const selected = views.find((view) => view.id === resolvedViewId) ?? views[0];
   views.forEach((view) => view.classList.toggle("active", view === selected));
   navLinks.forEach((link) => link.classList.toggle("active", link.dataset.view === selected.id));
   pageTitle.textContent = t(selected.dataset.titleKey);
-  if (selected.id === "administration" && authState.session?.session?.activeOrganizationId) {
+  if (["organization-administration", "administration"].includes(selected.id)
+    && authState.session?.session?.activeOrganizationId) {
     void loadAdministration();
+  }
+}
+
+function setWorkspaceMode(mode) {
+  const canAdminister = ["admin", "owner"].includes(authState.organizationRole);
+  workspaceMode = mode === "admin" && canAdminister ? "admin" : "front";
+  document.body.dataset.workspaceMode = workspaceMode;
+  adminNavLinks.forEach((link) => {
+    link.hidden = workspaceMode !== "admin";
+  });
+  navLinks.filter((link) => !link.classList.contains("admin-nav-link")).forEach((link) => {
+    link.hidden = workspaceMode === "admin";
+  });
+  workspaceModeToggle.hidden = !canAdminister;
+  workspaceModeToggle.textContent = t(
+    workspaceMode === "admin" ? "administration.openFrontpage" : "administration.openAdmin",
+  );
+  const currentView = location.hash.slice(1);
+  if (workspaceMode === "admin" && !["organization-administration", "administration"].includes(currentView)) {
+    history.replaceState(null, "", "#organization-administration");
+    showView("organization-administration");
+  } else if (workspaceMode === "front" && ["organization-administration", "administration"].includes(currentView)) {
+    history.replaceState(null, "", "#overview");
+    showView("overview");
   }
 }
 
@@ -384,6 +422,7 @@ function renderOrganizationAdministration() {
     : `<option value="">${escapeHtml(t("administration.noOrganizations"))}</option>`;
   administrationOrganizationSelect.disabled = organizations.length === 0;
   administrationMemberInviteForm.querySelector("button").disabled = !managedOrganizationId;
+  administrationInvitationStatus.textContent = state.administration.invitationStatus ?? "";
 
   administrationMembers.innerHTML = members.length === 0
     ? `<tr><td colspan="4"><div class="resource-state">${escapeHtml(t("administration.emptyMembers"))}</div></td></tr>`
@@ -428,10 +467,12 @@ function renderOrganizationAdministration() {
 }
 
 function renderAdministration() {
-  administrationError.hidden = !state.administration.error;
-  administrationError.textContent = state.administration.error
-    ? errorMessage(state.administration.error)
-    : "";
+  [administrationError, identityAdministrationError].forEach((target) => {
+    target.hidden = !state.administration.error;
+    target.textContent = state.administration.error
+      ? errorMessage(state.administration.error)
+      : "";
+  });
   const { users, devices, keys } = state.administration;
   renderOrganizationAdministration();
   const trustedStates = new Set(["LOCALLY_TRUSTED", "ORGANIZATION_VERIFIED"]);
@@ -456,15 +497,24 @@ function renderAdministration() {
     return matchesQuery && (!state.administration.userStatus || user.status === state.administration.userStatus);
   });
   administrationUsers.innerHTML = visibleUsers.length === 0
-    ? `<tr><td colspan="5"><div class="resource-state">${escapeHtml(t("administration.emptyUsers"))}</div></td></tr>`
-    : visibleUsers.map((user) => `
+    ? `<tr><td colspan="6"><div class="resource-state">${escapeHtml(t("administration.emptyUsers"))}</div></td></tr>`
+    : visibleUsers.map((user) => {
+      const assignment = state.administration.organizationAssignments.find(
+        (item) => item.email.toLowerCase() === user.email?.toLowerCase(),
+      );
+      const assignedOrganizations = state.administration.manageableOrganizations.filter(
+        (organization) => assignment?.organizationIds.includes(organization.id),
+      );
+      return `
       <tr>
         <td><div class="administration-identity"><strong>${escapeHtml(user.displayName ?? user.email ?? user.actorId)}</strong><small>${escapeHtml(user.email ?? user.actorId)}</small></div></td>
         <td><div class="administration-role-list">${(user.roles ?? []).length ? user.roles.map((role) => `<span class="administration-role">${escapeHtml(role.replaceAll("_", " "))}</span>`).join("") : "—"}</div></td>
+        <td><div class="administration-role-list">${assignedOrganizations.length ? assignedOrganizations.map((organization) => `<span class="administration-role organization-role">${escapeHtml(organization.name)}</span>`).join("") : "—"}</div></td>
         <td>${statusBadge(user.status)} ${user.trustState ? statusBadge(user.trustState) : ""}</td>
         <td>${escapeHtml(formatAdministrationDate(user.lastAuthenticatedAt))}</td>
         <td>${administrationUserActions(user)}</td>
-      </tr>`).join("");
+      </tr>`;
+    }).join("");
 
   const deviceQuery = state.administration.deviceSearch.toLowerCase();
   const visibleDevices = devices.filter((device) => {
@@ -570,7 +620,8 @@ async function showDeviceDetails(deviceId) {
 
 async function loadAdministration() {
   administrationError.hidden = true;
-  const loadingRow = `<tr><td colspan="5"><div class="resource-state loading">${escapeHtml(t("common.loading"))}</div></td></tr>`;
+  identityAdministrationError.hidden = true;
+  const loadingRow = `<tr><td colspan="6"><div class="resource-state loading">${escapeHtml(t("common.loading"))}</div></td></tr>`;
   administrationUsers.innerHTML = loadingRow;
   administrationDevices.innerHTML = administrationUsers.innerHTML;
   administrationKeys.innerHTML = administrationUsers.innerHTML;
@@ -595,6 +646,7 @@ async function loadAdministration() {
     organizationId
       ? auth.listOrganizationInvitations()
       : Promise.resolve([]),
+    api.administration.authOrganizations(),
   ]);
   const rejected = results.find((result) => result.status === "rejected");
   state.administration.users = results[0].status === "fulfilled" && Array.isArray(results[0].value.data)
@@ -612,6 +664,13 @@ async function loadAdministration() {
   state.administration.invitations = results[4].status === "fulfilled"
     ? results[4].value
     : [];
+  const authOrganizationAdministration = results[5].status === "fulfilled"
+    ? results[5].value.data
+    : null;
+  state.administration.manageableOrganizations =
+    authOrganizationAdministration?.organizations ?? [];
+  state.administration.organizationAssignments =
+    authOrganizationAdministration?.assignments ?? [];
   state.administration.error = rejected?.reason ?? null;
   renderAdministration();
 }
@@ -629,8 +688,11 @@ function clearResources() {
   state.administration = {
     ...state.administration,
     organizations: [],
+    manageableOrganizations: [],
+    organizationAssignments: [],
     members: [],
     invitations: [],
+    invitationStatus: null,
     managedOrganizationId: null,
     users: [],
     devices: [],
@@ -733,6 +795,7 @@ function renderAuth() {
   authError.textContent = authState.error ? errorMessage(authState.error) : "";
   authStatus.textContent = authState.loading ? t("auth.loading") : "";
   updateAuthGate();
+  setWorkspaceMode(workspaceMode);
 
   if (!auth.configured) {
     authError.textContent = t("auth.notConfiguredDetail");
@@ -778,9 +841,15 @@ async function refreshAuth() {
   renderAuth();
   try {
     authState.session = await auth.getSession();
-    authState.organizations = authState.session
-      ? await auth.listOrganizations()
-      : [];
+    if (authState.session) {
+      authState.organizations = await auth.listOrganizations();
+      authState.organizationRole = authState.session.session.activeOrganizationId
+        ? await auth.getActiveOrganizationRole().catch(() => null)
+        : null;
+    } else {
+      authState.organizations = [];
+      authState.organizationRole = null;
+    }
     if (!authState.session?.session?.activeOrganizationId) {
       clearResources();
     }
@@ -788,6 +857,7 @@ async function refreshAuth() {
     authState.error = error;
     authState.session = null;
     authState.organizations = [];
+    authState.organizationRole = null;
   } finally {
     authState.loading = false;
     renderAuth();
@@ -952,6 +1022,10 @@ const dialogDefinitions = {
     content: (actorId) => {
       const user = state.administration.users.find((item) => item.actorId === actorId);
       const roles = new Set(user?.roles ?? ["viewer"]);
+      const assignment = state.administration.organizationAssignments.find(
+        (item) => item.email.toLowerCase() === user?.email?.toLowerCase(),
+      );
+      const organizationIds = new Set(assignment?.organizationIds ?? []);
       const roleOptions = [
         ["organization_admin", "administration.roleAdmin"],
         ["compliance_manager", "administration.roleCompliance"],
@@ -983,6 +1057,19 @@ const dialogDefinitions = {
               </label>`).join("")}
           </div>
         </fieldset>
+        <fieldset>
+          <legend>${escapeHtml(t("administration.organizationAssignments"))}</legend>
+          <div class="administration-role-options">
+            ${state.administration.manageableOrganizations.length
+              ? state.administration.manageableOrganizations.map((organization) => `
+                <label class="radio-field">
+                  <input type="checkbox" name="organizationIds" value="${escapeHtml(organization.id)}" ${organizationIds.has(organization.id) ? "checked" : ""}>
+                  <span>${escapeHtml(organization.name)} · ${escapeHtml(organization.slug)}</span>
+                </label>`).join("")
+              : `<p class="form-hint">${escapeHtml(t("administration.noManageableOrganizations"))}</p>`}
+          </div>
+          <p class="form-hint">${escapeHtml(t("administration.organizationAssignmentHelp"))}</p>
+        </fieldset>
         <label>
           <span>${escapeHtml(t("administration.status"))}</span>
           <select name="status">
@@ -991,7 +1078,7 @@ const dialogDefinitions = {
           </select>
         </label>`;
     },
-    execute: (form, actorId) => {
+    execute: async (form, actorId) => {
       const roles = form.getAll("roles");
       if (roles.length === 0) {
         throw new ApiError("VALIDATION_ERROR", t("administration.roleRequired"), undefined, 400);
@@ -1016,9 +1103,15 @@ const dialogDefinitions = {
         roles,
         status: form.get("status"),
       };
-      return existing
+      const saved = existing
         ? api.administration.saveUser(existing.actorId, input)
         : api.administration.createUser(input);
+      const result = await saved;
+      const organizationIds = form.getAll("organizationIds");
+      if (existing || organizationIds.length > 0) {
+        await api.administration.saveAuthOrganizationAssignments(input.email, organizationIds);
+      }
+      return result;
     },
     success: "success.adminUser",
     refresh: loadAdministration,
@@ -1104,7 +1197,12 @@ languageButtons.forEach((button) => button.addEventListener("click", () => setLa
 document.querySelectorAll("[data-dialog]").forEach((button) =>
   button.addEventListener("click", () => openDialog(button.dataset.dialog)),
 );
-administrationRefresh.addEventListener("click", () => void loadAdministration());
+administrationRefreshButtons.forEach((button) => {
+  button.addEventListener("click", () => void loadAdministration());
+});
+workspaceModeToggle.addEventListener("click", () => {
+  setWorkspaceMode(workspaceMode === "admin" ? "front" : "admin");
+});
 administrationOrganizationSelect.addEventListener("change", () => {
   const organizationId = administrationOrganizationSelect.value;
   if (!organizationId) return;
@@ -1151,6 +1249,8 @@ administrationMemberInviteForm.addEventListener("submit", (event) => {
   const form = new FormData(administrationMemberInviteForm);
   const submit = administrationMemberInviteForm.querySelector("button");
   submit.disabled = true;
+  state.administration.invitationStatus = t("administration.invitationSending");
+  administrationInvitationStatus.textContent = state.administration.invitationStatus;
   void auth.inviteOrganizationMember(
     form.get("email").trim(),
     form.get("role"),
@@ -1158,9 +1258,13 @@ administrationMemberInviteForm.addEventListener("submit", (event) => {
   ).then(async () => {
     administrationMemberInviteForm.reset();
     await loadAdministration();
-    showToast(t("success.organizationInvitation"));
+    state.administration.invitationStatus = t("administration.invitationQueued");
+    renderOrganizationAdministration();
+    showToast(t("administration.invitationQueued"));
   }).catch((error) => {
     state.administration.error = error;
+    state.administration.invitationStatus = t("administration.invitationFailed")
+      .replace("{message}", errorMessage(error));
     renderAdministration();
   }).finally(() => {
     submit.disabled = false;
@@ -1206,7 +1310,7 @@ async function revokeAdministrationKey(keyId, button) {
   }
 }
 
-document.querySelector("#administration").addEventListener("click", (event) => {
+document.querySelector("main").addEventListener("click", (event) => {
   const saveMemberRoleButton = event.target.closest("[data-save-member-role]");
   if (saveMemberRoleButton) {
     const organizationId = state.administration.managedOrganizationId;

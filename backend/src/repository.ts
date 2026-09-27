@@ -65,6 +65,23 @@ export interface UpsertOrganizationUserInput {
   lastAuthenticatedAt?: string | null;
 }
 
+export interface ManagedAuthOrganization {
+  id: string;
+  name: string;
+  slug: string;
+  role: string;
+}
+
+export interface AuthOrganizationAssignment {
+  email: string;
+  organizationIds: string[];
+}
+
+export interface AuthOrganizationAdministration {
+  organizations: ManagedAuthOrganization[];
+  assignments: AuthOrganizationAssignment[];
+}
+
 export interface RegisterDeviceInput {
   deviceId: string;
   displayName: string;
@@ -129,6 +146,12 @@ export interface Repository {
   listOrganizationUsers(tenantId: string): Promise<OrganizationUser[]>;
   upsertOrganizationUser(tenantId: string, input: UpsertOrganizationUserInput): Promise<OrganizationUser>;
   getOrganizationUser(tenantId: string, actorId: string): Promise<OrganizationUser | null>;
+  getAuthOrganizationAdministration(subjectId: string): Promise<AuthOrganizationAdministration>;
+  setAuthOrganizationAssignments(
+    subjectId: string,
+    email: string,
+    organizationIds: string[],
+  ): Promise<AuthOrganizationAssignment>;
   getIdentitySnapshot(tenantId: string, actorId: string): Promise<OrganizationIdentitySnapshot>;
   listDevices(tenantId: string, actorId?: string): Promise<RegisteredDevice[]>;
   registerDevice(tenantId: string, actorId: string, input: RegisterDeviceInput): Promise<RegisteredDevice>;
@@ -384,6 +407,18 @@ export class MemoryRepository implements Repository {
 
   async getOrganizationUser(tenantId: string, actorId: string): Promise<OrganizationUser | null> {
     return structuredClone(this.organizationUsers.get(`${tenantId}:${actorId}`) ?? null);
+  }
+
+  async getAuthOrganizationAdministration(_subjectId: string): Promise<AuthOrganizationAdministration> {
+    return { organizations: [], assignments: [] };
+  }
+
+  async setAuthOrganizationAssignments(
+    _subjectId: string,
+    email: string,
+    organizationIds: string[],
+  ): Promise<AuthOrganizationAssignment> {
+    return { email, organizationIds: structuredClone(organizationIds) };
   }
 
   async getIdentitySnapshot(tenantId: string, actorId: string): Promise<OrganizationIdentitySnapshot> {
@@ -1186,6 +1221,151 @@ export class PgRepository implements Repository {
       [tenantId, actorId],
     );
     return result.rowCount ? organizationUserFromRow(result.rows[0]) : null;
+  }
+
+  async getAuthOrganizationAdministration(subjectId: string): Promise<AuthOrganizationAdministration> {
+    const organizations = await this.pool.query(
+      `SELECT organization.id, organization.name, organization.slug, member.role
+         FROM neon_auth.member AS member
+         JOIN neon_auth.organization AS organization
+           ON organization.id = member."organizationId"
+        WHERE member."userId" = $1::uuid
+          AND member.role IN ('admin', 'owner')
+        ORDER BY lower(organization.name), organization.id`,
+      [subjectId],
+    );
+    const organizationIds = organizations.rows.map((row) => String(row.id));
+    if (organizationIds.length === 0) {
+      return { organizations: [], assignments: [] };
+    }
+    const assignments = await this.pool.query(
+      `SELECT auth_user.email,
+              array_agg(member."organizationId"::text ORDER BY member."organizationId"::text) AS organization_ids
+         FROM neon_auth.member AS member
+         JOIN neon_auth."user" AS auth_user
+           ON auth_user.id = member."userId"
+        WHERE member."organizationId" = ANY($1::uuid[])
+        GROUP BY auth_user.email
+        ORDER BY lower(auth_user.email)`,
+      [organizationIds],
+    );
+    return {
+      organizations: organizations.rows.map((row) => ({
+        id: String(row.id),
+        name: String(row.name),
+        slug: String(row.slug),
+        role: String(row.role),
+      })),
+      assignments: assignments.rows.map((row) => ({
+        email: String(row.email),
+        organizationIds: Array.isArray(row.organization_ids)
+          ? row.organization_ids.map(String)
+          : [],
+      })),
+    };
+  }
+
+  async setAuthOrganizationAssignments(
+    subjectId: string,
+    email: string,
+    organizationIds: string[],
+  ): Promise<AuthOrganizationAssignment> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const manageable = await client.query(
+        `SELECT "organizationId"::text AS organization_id
+           FROM neon_auth.member
+          WHERE "userId" = $1::uuid
+            AND role IN ('admin', 'owner')
+          FOR UPDATE`,
+        [subjectId],
+      );
+      const manageableIds = new Set(manageable.rows.map((row) => String(row.organization_id)));
+      if (organizationIds.some((organizationId) => !manageableIds.has(organizationId))) {
+        throw new AppError(
+          "ORGANIZATION_FORBIDDEN",
+          "One or more organizations cannot be managed by this administrator",
+          403,
+        );
+      }
+      const authUser = await client.query(
+        `SELECT id, email
+           FROM neon_auth."user"
+          WHERE lower(email) = lower($1)
+          FOR UPDATE`,
+        [email],
+      );
+      if (!authUser.rowCount) {
+        throw new AppError(
+          "AUTH_USER_NOT_FOUND",
+          "The user must create or activate the login account before organizations can be assigned",
+          404,
+        );
+      }
+      const userId = String(authUser.rows[0].id);
+      const manageableList = [...manageableIds];
+      if (
+        userId === subjectId
+        && manageableList.some((organizationId) => !organizationIds.includes(organizationId))
+      ) {
+        throw new AppError(
+          "SELF_ORGANIZATION_REMOVAL_FORBIDDEN",
+          "Administrators cannot remove their own managed organization assignments",
+          409,
+        );
+      }
+      if (manageableList.length > 0) {
+        await client.query(
+          `DELETE FROM neon_auth.member
+            WHERE "userId" = $1::uuid
+              AND "organizationId" = ANY($2::uuid[])
+              AND NOT ("organizationId" = ANY($3::uuid[]))`,
+          [userId, manageableList, organizationIds],
+        );
+      }
+      for (const organizationId of organizationIds) {
+        await client.query(
+          `INSERT INTO neon_auth.member ("organizationId", "userId", role, "createdAt")
+           VALUES ($1::uuid, $2::uuid, 'member', CURRENT_TIMESTAMP)
+           ON CONFLICT ("userId", "organizationId") DO NOTHING`,
+          [organizationId, userId],
+        );
+      }
+      const membershipCount = await client.query(
+        `SELECT count(*)::int AS count
+           FROM neon_auth.member
+          WHERE "userId" = $1::uuid`,
+        [userId],
+      );
+      if (Number(membershipCount.rows[0]?.count ?? 0) === 0) {
+        await client.query(
+          `INSERT INTO neon_auth.member ("organizationId", "userId", role, "createdAt")
+           SELECT id, $1::uuid, 'member', CURRENT_TIMESTAMP
+             FROM neon_auth.organization
+            WHERE slug = 'sctracker-standard'
+           ON CONFLICT ("userId", "organizationId") DO NOTHING`,
+          [userId],
+        );
+      }
+      const assigned = await client.query(
+        `SELECT "organizationId"::text AS organization_id
+           FROM neon_auth.member
+          WHERE "userId" = $1::uuid
+          ORDER BY "organizationId"::text`,
+        [userId],
+      );
+      await client.query("COMMIT");
+      return {
+        email: String(authUser.rows[0].email),
+        organizationIds: assigned.rows.map((row) => String(row.organization_id)),
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async getIdentitySnapshot(tenantId: string, actorId: string): Promise<OrganizationIdentitySnapshot> {

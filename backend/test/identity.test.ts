@@ -236,6 +236,50 @@ describe("identity and trust backend", () => {
     await adminApp.close();
   });
 
+  it("manages authentication organization assignments through the admin API", async () => {
+    const productionConfig: Config = {
+      ...config,
+      NODE_ENV: "production",
+      DEV_AUTH_ENABLED: false,
+      NEON_AUTH_BASE_URL: "https://auth.example.test/sctracker/auth",
+    };
+    const app = await buildApp({
+      config: productionConfig,
+      repository,
+      providers,
+      authVerifier: async () => ({
+        sub: "00000000-0000-4000-8000-000000000201",
+        exp: Math.floor(Date.now() / 1000) + 300,
+        activeOrganizationId: "00000000-0000-4000-8000-000000000202",
+        roles: ["organization_admin"],
+      }),
+    });
+
+    const listed = await app.inject({
+      method: "GET",
+      url: "/api/v1/admin/auth-organizations",
+      headers: { authorization: "Bearer test-token" },
+    });
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json().data).toEqual({ organizations: [], assignments: [] });
+
+    const updated = await app.inject({
+      method: "PUT",
+      url: "/api/v1/admin/auth-organizations/assignments",
+      headers: { authorization: "Bearer test-token" },
+      payload: {
+        email: "person@example.test",
+        organizationIds: ["00000000-0000-4000-8000-000000000203"],
+      },
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json().data).toEqual({
+      email: "person@example.test",
+      organizationIds: ["00000000-0000-4000-8000-000000000203"],
+    });
+    await app.close();
+  });
+
   it("keeps admin identity listings tenant-isolated", async () => {
     await repository.upsertOrganizationUser(tenantId, {
       actorId,

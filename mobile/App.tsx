@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   Modal,
   Platform,
   Pressable,
@@ -1373,7 +1374,20 @@ export default function App() {
     }
 
     try {
-      setOrganizations(await listOrganizations());
+      const nextOrganizations = await listOrganizations();
+      setOrganizations(nextOrganizations);
+      if (!nextSession.session.activeOrganizationId && nextOrganizations.length > 0) {
+        const organizationId = nextOrganizations[0].id;
+        await setActiveOrganization(organizationId);
+        nextSession = {
+          ...nextSession,
+          session: {
+            ...nextSession.session,
+            activeOrganizationId: organizationId,
+          },
+        };
+        setAuthSession(nextSession);
+      }
     } catch (error) {
       setOrganizations([]);
       setAuthError(error instanceof Error ? error.message : String(error));
@@ -1400,6 +1414,13 @@ export default function App() {
 
   useEffect(() => {
     void refreshAuth();
+  }, []);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (status) => {
+      if (status === "active") void refreshAuth();
+    });
+    return () => subscription.remove();
   }, []);
 
   useEffect(() => {
